@@ -4,30 +4,30 @@
 - [X] Crear workspace (`qrfs_core` + `qrfs_cli`)
 - [X] Definir módulos base (`disk`, `storage`, `fs`, `errors`)
 - [X] Crear binarios CLI: `mkfs`, `mount`, `fsck`
-- [ ] Integrar crate de FUSE (`fuse3` o `polyfuse`)
+- [X] Integrar crate de FUSE (`fuse3` o `polyfuse`)
 
 ## FASE 2 — Definición del formato del disco (Diseño del FS)
-- [ ] Elegir tamaño del bloque (`BLOCK_SIZE`)
-- [ ] Diseñar Superblock:
-  - [ ] Firma mágica ("QRFS")
-  - [ ] Versión
-  - [ ] Block size
-  - [ ] Cantidad total de bloques
-  - [ ] Inicio y longitud del mapa de bloques libres
-  - [ ] Inicio de tabla de inodos
-  - [ ] Cantidad máxima de inodos
-  - [ ] Inicio del directorio raíz
-- [ ] Diseñar mapa de bloques libres (bitmap)
-- [ ] Definir estructura de los Inodes:
-  - [ ] Tipo (archivo/directorio)
-  - [ ] Tamaño
-  - [ ] Bloques asignados
-  - [ ] Timestamps
-  - [ ] Permisos
-- [ ] Definir formato del directorio:
-  - [ ] Entradas `<nombre → inodo>`
-  - [ ] Tamaño variable o entradas fijas
-  - [ ] Entradas especiales `.` y `..` (si aplica)
+- [X] Elegir tamaño del bloque (`BLOCK_SIZE`)
+- [X] Diseñar Superblock:
+  - [X] Firma mágica ("QRFS")
+  - [X] Versión
+  - [X] Block size
+  - [X] Cantidad total de bloques
+  - [X] Inicio y longitud del mapa de bloques libres
+  - [X] Inicio de tabla de inodos
+  - [X] Cantidad máxima de inodos
+  - [X] Inicio del directorio raíz
+- [X] Diseñar mapa de bloques libres (bitmap)
+- [X] Definir estructura de los Inodes:
+  - [X] Tipo (archivo/directorio)
+  - [X] Tamaño
+  - [X] Bloques asignados
+  - [X] Timestamps
+  - [X] Permisos
+- [X] Definir formato del directorio:
+  - [X] Entradas `<nombre → inodo>`
+  - [X] Tamaño variable o entradas fijas
+  - [X] Entradas especiales `.` y `..` (si aplica)
 
 ## FASE 3 — Implementación del almacenamiento (Block Storage)
 ### QrStorageManager

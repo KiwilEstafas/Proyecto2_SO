@@ -2,8 +2,10 @@ pub mod disk;
 pub mod storage;
 pub mod fs;
 pub mod errors;
+pub mod fs_format;
 
-pub use crate::disk::{BlockId, Superblock, Inode, DirectoryEntry, InodeKind};
-pub use crate::storage::{BlockStorage, QrStorageManager};
-pub use crate::fs::QrfsFilesystem;
-pub use crate::errors::QrfsError;
+pub use crate::disk::*;
+pub use crate::storage::*;
+pub use crate::fs::*;
+pub use crate::errors::*;
+pub use crate::fs_format::*;
