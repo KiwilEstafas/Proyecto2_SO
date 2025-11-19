@@ -38,17 +38,16 @@
 - [X] Inicializar archivo físico con bloques vacíos
 
 ### Modo de pruebas
-- [ ] Crear implementación de storage "in-memory" (Vec<u8>) para tests
+- [X] Crear implementación de storage "in-memory" (Vec<u8>) para tests
 
 ## FASE 4 — mkfs (crear un filesystem QRFS)
-- [ ] Parsear parámetros (`--size`, `--blocks`, `--output`)
-- [ ] Crear archivo físico vacío con tamaño indicado
-- [ ] Calcular distribución del disco
-- [ ] Escribir Superblock
-- [ ] Generar y escribir mapa de bloques libres
-- [ ] Inicializar tabla de inodos vacía
-- [ ] Crear inodo del directorio raíz
-- [ ] Validar integridad leyendo superblock
+- [X] Parsear parámetros (`--size`, `--blocks`, `--output`)
+- [X] Crear archivo físico vacío con tamaño indicado
+- [X] Calcular distribución del disco
+- [X] Escribir Superblock
+- [X] Inicializar tabla de inodos vacía
+- [X] Crear inodo del directorio raíz
+- [X] Validar integridad leyendo superblock
 
 ## FASE 5 — Montaje del FS (mount)
 - [ ] Abrir archivo QRFS
