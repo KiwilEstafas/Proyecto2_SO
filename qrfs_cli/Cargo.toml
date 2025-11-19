@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 qrfs_core = { path = "../qrfs_core" }
+fuse3 = { version = "0.8", features = ["tokio-runtime"] }
+tokio = { version = "1", features = ["full"] }

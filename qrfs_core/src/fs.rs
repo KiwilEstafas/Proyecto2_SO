@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::errors::QrfsError;
 use crate::storage::BlockStorage;
 
-/// Implementación de QRFS que más adelante implementará fuser::Filesystem
+/// Implementación de QRFS que mas adelante implementara fuser::Filesystem
 pub struct QrfsFilesystem<B: BlockStorage + 'static> {
     storage: Arc<B>,
 }
