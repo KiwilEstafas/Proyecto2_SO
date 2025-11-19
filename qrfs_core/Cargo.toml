@@ -1,0 +1,14 @@
+[package]
+name = "qrfs_core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+bincode = "1"
+thiserror = "1"
+
+# a futuro:
+# fuser = "0.14"
+# qrcode = "0.14"
+# image = "0.25"
