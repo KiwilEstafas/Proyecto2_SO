@@ -1,8 +1,9 @@
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::sync::Mutex;
 
-use crate::disk::{BlockId, BLOCK_SIZE};
+use crate::disk::BlockId;
 use crate::errors::QrfsError;
 
 /// trait para cualquier backend de bloques
@@ -14,8 +15,7 @@ pub trait BlockStorage: Send + Sync {
     fn write_block(&self, id: BlockId, data: &[u8]) -> Result<(), QrfsError>;
 }
 
-/// implementacion base que luego hablara con imagenes png qr
-/// por ahora cada bloque se mapea a un archivo binario en disco
+/// implementacion base que usa archivos en disco
 pub struct QrStorageManager {
     root_dir: PathBuf,
     block_size: usize,
@@ -80,7 +80,6 @@ impl BlockStorage for QrStorageManager {
         let path = self.block_path(id);
         let mut buf = vec![0u8; self.block_size];
 
-        // si no existe el archivo, se asume bloque lleno de ceros
         if !path.exists() {
             return Ok(buf);
         }
@@ -124,6 +123,81 @@ impl BlockStorage for QrStorageManager {
             let padding_len = self.block_size - data.len();
             let padding = vec![0u8; padding_len];
             file.write_all(&padding)?;
+        }
+
+        Ok(())
+    }
+}
+
+/// implementacion de almacenamiento en memoria para pruebas
+pub struct InMemoryBlockStorage {
+    block_size: usize,
+    total_blocks: u32,
+    data: Mutex<Vec<u8>>,
+}
+
+impl InMemoryBlockStorage {
+    /// crea un storage en memoria con todos los bloques en cero
+    pub fn new(total_blocks: u32, block_size: usize) -> Self {
+        let len = total_blocks as usize * block_size;
+        Self {
+            block_size,
+            total_blocks,
+            data: Mutex::new(vec![0u8; len]),
+        }
+    }
+
+    fn check_range(&self, id: BlockId) -> Result<usize, QrfsError> {
+        if id >= self.total_blocks {
+            return Err(QrfsError::Other(format!(
+                "block id {id} fuera de rango 0..{}",
+                self.total_blocks - 1
+            )));
+        }
+        let offset = id as usize * self.block_size;
+        Ok(offset)
+    }
+}
+
+impl BlockStorage for InMemoryBlockStorage {
+    fn block_size(&self) -> usize {
+        self.block_size
+    }
+
+    fn total_blocks(&self) -> u32 {
+        self.total_blocks
+    }
+
+    fn read_block(&self, id: BlockId) -> Result<Vec<u8>, QrfsError> {
+        let offset = self.check_range(id)?;
+        let end = offset + self.block_size;
+
+        let data = self.data.lock().unwrap();
+        Ok(data[offset..end].to_vec())
+    }
+
+    fn write_block(&self, id: BlockId, data: &[u8]) -> Result<(), QrfsError> {
+        if data.len() > self.block_size {
+            return Err(QrfsError::Other(format!(
+                "write_block datos demasiado grandes {} > {}",
+                data.len(),
+                self.block_size
+            )));
+        }
+
+        let offset = self.check_range(id)?;
+        let end = offset + self.block_size;
+
+        let mut data_vec = self.data.lock().unwrap();
+        let slice = &mut data_vec[offset..end];
+
+        let to_copy = data.len();
+        slice[..to_copy].copy_from_slice(data);
+
+        if to_copy < self.block_size {
+            for b in &mut slice[to_copy..] {
+                *b = 0;
+            }
         }
 
         Ok(())
