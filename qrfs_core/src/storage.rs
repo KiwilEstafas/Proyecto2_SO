@@ -203,3 +203,57 @@ impl BlockStorage for InMemoryBlockStorage {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::disk::BLOCK_SIZE;
+
+    fn temp_dir() -> std::path::PathBuf {
+        let base = std::env::temp_dir();
+        let unique = format!("qrfs_storage_test_{}", std::process::id());
+        let dir = base.join(unique);
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn inmemory_roundtrip_read_write() {
+        let storage = InMemoryBlockStorage::new(4, BLOCK_SIZE);
+
+        let data = b"hola qrfs";
+        storage.write_block(1, data).unwrap();
+
+        let read = storage.read_block(1).unwrap();
+        assert_eq!(&read[..data.len()], data);
+        assert_eq!(read.len(), BLOCK_SIZE);
+        for b in &read[data.len()..] {
+            assert_eq!(*b, 0);
+        }
+    }
+
+    #[test]
+    fn inmemory_out_of_range_fails() {
+        let storage = InMemoryBlockStorage::new(2, BLOCK_SIZE);
+        let res = storage.read_block(5);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn qrstorage_init_creates_zero_blocks() {
+        let dir = temp_dir();
+        let storage = QrStorageManager::new(&dir, BLOCK_SIZE, 4);
+
+        storage.init_empty_blocks().unwrap();
+
+        for id in 0..4 {
+            let path = storage.block_path(id);
+            assert!(path.exists());
+
+            let content = storage.read_block(id).unwrap();
+            assert_eq!(content.len(), BLOCK_SIZE);
+            assert!(content.iter().all(|b| *b == 0));
+        }
+    }
+}

@@ -128,3 +128,41 @@ impl Superblock {
         self.magic == QRFS_MAGIC && self.version == QRFS_VERSION
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn superblock_basic_layout_is_consistent() {
+        let sb = Superblock::new(128, 64);
+
+        assert_eq!(sb.magic, QRFS_MAGIC);
+        assert_eq!(sb.version, QRFS_VERSION);
+        assert!(sb.is_valid());
+
+        assert_eq!(sb.block_size as usize, BLOCK_SIZE);
+        assert_eq!(sb.free_map_start, 1);
+        assert_eq!(sb.free_map_blocks, 1);
+
+        assert_eq!(sb.inode_table_start, sb.free_map_start + sb.free_map_blocks);
+        assert_eq!(
+            sb.data_block_start,
+            sb.inode_table_start + sb.inode_table_blocks
+        );
+    }
+
+    #[test]
+    fn inode_new_has_default_values() {
+        let inode = Inode::new(10, InodeKind::File);
+
+        assert_eq!(inode.id, 10);
+        matches!(inode.kind, InodeKind::File);
+        assert_eq!(inode.size, 0);
+        assert!(inode.blocks.is_empty());
+        assert_eq!(inode.mode, 0o755);
+
+        assert!(inode.created_at > 0);
+        assert!(inode.modified_at >= inode.created_at);
+    }
+}
