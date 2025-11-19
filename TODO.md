@@ -31,11 +31,11 @@
 
 ## FASE 3 — Implementación del almacenamiento (Block Storage)
 ### QrStorageManager
-- [ ] Implementar `new(path, num_blocks)`
-- [ ] Implementar `read_block(id)`
-- [ ] Implementar `write_block(id, data)`
-- [ ] Prevenir lecturas/escrituras fuera de rango
-- [ ] Inicializar archivo físico con bloques vacíos
+- [X] Implementar `new(path, num_blocks)`
+- [X] Implementar `read_block(id)`
+- [X] Implementar `write_block(id, data)`
+- [X] Prevenir lecturas/escrituras fuera de rango
+- [X] Inicializar archivo físico con bloques vacíos
 
 ### Modo de pruebas
 - [ ] Crear implementación de storage "in-memory" (Vec<u8>) para tests
