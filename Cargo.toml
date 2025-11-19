@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "qrfs-core",
+    "qrfs-cli",
+]
+resolver = "2"
