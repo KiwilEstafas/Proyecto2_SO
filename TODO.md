@@ -204,13 +204,13 @@
 - [X] Validar integridad leyendo superblock
 
 ## FASE 5 — Montaje del FS (mount)
-- [ ] Abrir archivo QRFS
-- [ ] Leer y validar Superblock
-- [ ] Cargar bitmap a memoria
-- [ ] Cargar tabla de inodos
-- [ ] Cargar directorio raíz
-- [ ] Construir estructura `QrfsFilesystem` en memoria
-- [ ] Implementar capa de abstracción para operar con FUSE
+- [X] Abrir archivo QRFS
+- [X] Leer y validar Superblock 
+- [] Cargar bitmap a memoria (Sin hacer por el momento, porque no lo ocupe para leer, pero si se ocupa para escribir!)
+- [X] Cargar tabla de inodos 
+- [X] Cargar directorio raíz
+- [X] Construir estructura `QrfsFilesystem` en memoria
+- [X] Implementar capa de abstracción para operar con FUSE 
 
 ## FASE 6 — Implementación REAL de las operaciones FUSE
 

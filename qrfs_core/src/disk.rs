@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub type BlockId = u32;
 
 /// tamaño fijo del bloque logico
-pub const BLOCK_SIZE: usize = 512; //512 para que sea posible leerlos en 200x200 como dijo el profe en clase
+pub const BLOCK_SIZE: usize = 256; // se bajo de 512 a 256 para lectura robuzta (en un paso aumeta 33% su tamaño)
 
 /// numero magico qrfs
 pub const QRFS_MAGIC: u32 = 0x5152_4653;
