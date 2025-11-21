@@ -17,7 +17,161 @@
   - [X] Inicio de tabla de inodos
   - [X] Cantidad máxima de inodos
   - [X] Inicio del directorio raíz
-- [X] Diseñar mapa de bloques libres (bitmap)
+- [X] Diseñar mapa de bloques libres (bitmap)[{
+	"resource": "/home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs",
+	"owner": "rustc",
+	"code": {
+		"value": "Click for full compiler diagnostic",
+		"target": {
+			"$mid": 1,
+			"path": "/diagnostic message [2]",
+			"scheme": "rust-analyzer-diagnostics-view",
+			"query": "2",
+			"fragment": "file:///home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs"
+		}
+	},
+	"severity": 8,
+	"message": "no field `root_dir` on type `&InMemoryBlockStorage`\navailable fields are: `block_size`, `total_blocks`, `data`",
+	"source": "rustc",
+	"startLineNumber": 174,
+	"startColumn": 25,
+	"endLineNumber": 174,
+	"endColumn": 33,
+	"origin": "extHost1"
+},{
+	"resource": "/home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs",
+	"owner": "rustc",
+	"code": {
+		"value": "Click for full compiler diagnostic",
+		"target": {
+			"$mid": 1,
+			"path": "/diagnostic message [5]",
+			"scheme": "rust-analyzer-diagnostics-view",
+			"query": "5",
+			"fragment": "file:///home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs"
+		}
+	},
+	"severity": 8,
+	"message": "no field `root_dir` on type `&storage::InMemoryBlockStorage`\navailable fields are: `block_size`, `total_blocks`, `data`",
+	"source": "rustc",
+	"startLineNumber": 174,
+	"startColumn": 25,
+	"endLineNumber": 174,
+	"endColumn": 33,
+	"origin": "extHost1"
+},{
+	"resource": "/home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs",
+	"owner": "rustc",
+	"code": {
+		"value": "Click for full compiler diagnostic",
+		"target": {
+			"$mid": 1,
+			"path": "/diagnostic message [8]",
+			"scheme": "rust-analyzer-diagnostics-view",
+			"query": "8",
+			"fragment": "file:///home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs"
+		}
+	},
+	"severity": 8,
+	"message": "no field `root_dir` on type `&InMemoryBlockStorage`\navailable fields are: `block_size`, `total_blocks`, `data`",
+	"source": "rustc",
+	"startLineNumber": 209,
+	"startColumn": 25,
+	"endLineNumber": 209,
+	"endColumn": 33,
+	"origin": "extHost1"
+},{
+	"resource": "/home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs",
+	"owner": "rustc",
+	"code": {
+		"value": "Click for full compiler diagnostic",
+		"target": {
+			"$mid": 1,
+			"path": "/diagnostic message [7]",
+			"scheme": "rust-analyzer-diagnostics-view",
+			"query": "7",
+			"fragment": "file:///home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs"
+		}
+	},
+	"severity": 8,
+	"message": "no field `root_dir` on type `&storage::InMemoryBlockStorage`\navailable fields are: `block_size`, `total_blocks`, `data`",
+	"source": "rustc",
+	"startLineNumber": 209,
+	"startColumn": 25,
+	"endLineNumber": 209,
+	"endColumn": 33,
+	"origin": "extHost1"
+},{
+	"resource": "/home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs",
+	"owner": "rustc",
+	"code": {
+		"value": "Click for full compiler diagnostic",
+		"target": {
+			"$mid": 1,
+			"path": "/diagnostic message [6]",
+			"scheme": "rust-analyzer-diagnostics-view",
+			"query": "6",
+			"fragment": "file:///home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs"
+		}
+	},
+	"severity": 8,
+	"message": "the method `detect_grids` exists for struct `PreparedImage<DynamicImage>`, but its trait bounds were not satisfied\nthe following trait bounds were not satisfied:\n`<DynamicImage as GenericImageView>::Pixel = Luma<u8>`\nwhich is required by `DynamicImage: rqrr::prepare::ImageBuffer`",
+	"source": "rustc",
+	"startLineNumber": 183,
+	"startColumn": 29,
+	"endLineNumber": 183,
+	"endColumn": 41,
+	"relatedInformation": [
+		{
+			"startLineNumber": 71,
+			"startColumn": 1,
+			"endLineNumber": 71,
+			"endColumn": 22,
+			"message": "doesn't satisfy `<_ as GenericImageView>::Pixel = Luma<u8>` or `DynamicImage: rqrr::prepare::ImageBuffer`",
+			"resource": "/home/estudiante/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/image-0.25.9/src/images/dynimage.rs"
+		}
+	],
+	"origin": "extHost1"
+},{
+	"resource": "/home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs",
+	"owner": "rustc",
+	"code": {
+		"value": "Click for full compiler diagnostic",
+		"target": {
+			"$mid": 1,
+			"path": "/diagnostic message [3]",
+			"scheme": "rust-analyzer-diagnostics-view",
+			"query": "3",
+			"fragment": "file:///home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs"
+		}
+	},
+	"severity": 8,
+	"message": "type mismatch resolving `<DynamicImage as GenericImageView>::Pixel == Luma<u8>`\nexpected struct `Luma<u8>`\n   found struct `Rgba<u8>`\nrequired for `DynamicImage` to implement `rqrr::prepare::ImageBuffer`",
+	"source": "rustc",
+	"startLineNumber": 181,
+	"startColumn": 56,
+	"endLineNumber": 181,
+	"endColumn": 59,
+	"relatedInformation": [
+		{
+			"startLineNumber": 181,
+			"startColumn": 27,
+			"endLineNumber": 181,
+			"endColumn": 55,
+			"message": "required by a bound introduced by this call",
+			"resource": "/home/estudiante/Escritorio/Proyecto2_SO/qrfs_core/src/storage.rs"
+		},
+		{
+			"startLineNumber": 180,
+			"startColumn": 8,
+			"endLineNumber": 180,
+			"endColumn": 19,
+			"message": "required by a bound in `PreparedImage::<S>::prepare`",
+			"resource": "/home/estudiante/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rqrr-0.10.0/src/prepare.rs"
+		}
+	],
+	"origin": "extHost1"
+}]
 - [X] Definir estructura de los Inodes:
   - [X] Tipo (archivo/directorio)
   - [X] Tamaño

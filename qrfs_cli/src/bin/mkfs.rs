@@ -173,12 +173,20 @@ fn mkfs_with_params(
     let mut offset = 0;
     for i in 0..superblock.inode_table_blocks {
         let mut blk_buf = vec![0u8; block_size];
-        let end = usize::min(offset + block_size, inode_table_raw.len());
-        let len = end - offset;
-        if len > 0 {
-            blk_buf[..len].copy_from_slice(&inode_table_raw[offset..end]);
+        
+        // CORRECCIÓN: Solo intentamos copiar si aún quedan datos
+        if offset < inode_table_raw.len() {
+            let end = usize::min(offset + block_size, inode_table_raw.len());
+            let len = end - offset;
+            
+            if len > 0 {
+                blk_buf[..len].copy_from_slice(&inode_table_raw[offset..end]);
+            }
         }
+        
+        // Escribimos el bloque (sea con datos parciales o totalmente vacío/relleno de ceros)
         storage.write_block(superblock.inode_table_start + i, &blk_buf)?;
+        
         offset += block_size;
     }
 

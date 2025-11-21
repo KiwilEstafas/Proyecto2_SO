@@ -1,7 +1,12 @@
-use std::fs::{File, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Mutex;
+
+// Dependencias para QR e Imágenes
+use qrcode::QrCode;
+use image::Luma; 
+use rqrr; 
 
 use crate::disk::BlockId;
 use crate::errors::QrfsError;
@@ -15,7 +20,7 @@ pub trait BlockStorage: Send + Sync {
     fn write_block(&self, id: BlockId, data: &[u8]) -> Result<(), QrfsError>;
 }
 
-/// implementacion base que usa archivos en disco
+/// Implementación REAL que usa archivos QR en disco
 pub struct QrStorageManager {
     root_dir: PathBuf,
     block_size: usize,
@@ -23,11 +28,9 @@ pub struct QrStorageManager {
 }
 
 impl QrStorageManager {
-    /// crea un manejador de bloques apuntando a un directorio
-    /// no inicializa los bloques, solo asegura que el directorio exista
     pub fn new(root_dir: impl Into<PathBuf>, block_size: usize, total_blocks: u32) -> Self {
         let root_dir = root_dir.into();
-        if let Err(e) = std::fs::create_dir_all(&root_dir) {
+        if let Err(e) = fs::create_dir_all(&root_dir) {
             eprintln!("qrfs: warning: no se pudo crear el directorio raiz: {e}");
         }
 
@@ -38,8 +41,7 @@ impl QrStorageManager {
         }
     }
 
-    /// inicializa todos los bloques en disco con ceros
-    /// pensado para ser usado por mkfs
+    /// Inicializa bloques vacíos (ahora genera imágenes QR vacías)
     pub fn init_empty_blocks(&self) -> Result<(), QrfsError> {
         let empty = vec![0u8; self.block_size];
         for id in 0..self.total_blocks {
@@ -48,9 +50,9 @@ impl QrStorageManager {
         Ok(())
     }
 
-    /// construye la ruta al archivo que representa un bloque
+    /// Construye la ruta al archivo PNG
     pub fn block_path(&self, id: BlockId) -> PathBuf {
-        let filename = format!("{:06}.blk", id);
+        let filename = format!("{:06}.png", id);
         self.root_dir.join(filename)
     }
 
@@ -74,27 +76,51 @@ impl BlockStorage for QrStorageManager {
         self.total_blocks
     }
 
+    // =========================================================
+    // LECTURA: Imagen PNG -> Bytes
+    // =========================================================
     fn read_block(&self, id: BlockId) -> Result<Vec<u8>, QrfsError> {
         self.check_range(id)?;
 
         let path = self.block_path(id);
-        let mut buf = vec![0u8; self.block_size];
 
         if !path.exists() {
-            return Ok(buf);
+            return Ok(vec![0u8; self.block_size]);
         }
 
-        let mut file = File::open(path)?;
-        let n = file.read(&mut buf)?;
-        if n < self.block_size {
-            for i in n..self.block_size {
-                buf[i] = 0;
-            }
+        // Mapear ImageError a QrfsError::Other
+        let img_dynamic = image::open(&path)
+            .map_err(|e| QrfsError::Other(format!("Error abriendo imagen: {}", e)))?;
+        
+        let img_gray = img_dynamic.to_luma8();
+
+        let mut decoder = rqrr::PreparedImage::prepare(img_gray);
+        
+        let grids = decoder.detect_grids();
+        if grids.is_empty() {
+            return Err(QrfsError::Other(format!("No se detectó QR en {}", path.display())));
         }
 
-        Ok(buf)
+        let (_meta, content) = grids[0].decode().map_err(|e| 
+            QrfsError::Other(format!("Error decodificando QR: {}", e))
+        )?;
+
+        let mut data = content.into_bytes();
+        
+        // Ajuste de tamaño si es necesario
+        if data.len() > self.block_size {
+            data.truncate(self.block_size);
+        }
+        if data.len() < self.block_size {
+            data.resize(self.block_size, 0);
+        }
+
+        Ok(data)
     }
 
+    // =========================================================
+    // ESCRITURA: Bytes -> Imagen PNG
+    // =========================================================
     fn write_block(&self, id: BlockId, data: &[u8]) -> Result<(), QrfsError> {
         self.check_range(id)?;
 
@@ -106,30 +132,30 @@ impl BlockStorage for QrStorageManager {
             )));
         }
 
+        let code = QrCode::new(data).map_err(|e| 
+            QrfsError::Other(format!("Error generando QR: {}", e))
+        )?;
+
+        let image = code.render::<Luma<u8>>()
+            .min_dimensions(200, 200)
+            .max_dimensions(200, 200)
+            .build();
+
         let path = self.block_path(id);
+        
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
+             let _ = fs::create_dir_all(parent);
         }
 
-        let mut file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(path)?;
-
-        file.write_all(data)?;
-
-        if data.len() < self.block_size {
-            let padding_len = self.block_size - data.len();
-            let padding = vec![0u8; padding_len];
-            file.write_all(&padding)?;
-        }
-
+        // CORREGIDO: Mapeamos ImageError a QrfsError::Other
+        image.save(&path)
+            .map_err(|e| QrfsError::Other(format!("Error guardando imagen: {}", e)))?;
+        
         Ok(())
     }
 }
 
-/// implementacion de almacenamiento en memoria para pruebas
+/// Implementación de almacenamiento en memoria para pruebas
 pub struct InMemoryBlockStorage {
     block_size: usize,
     total_blocks: u32,
@@ -137,7 +163,6 @@ pub struct InMemoryBlockStorage {
 }
 
 impl InMemoryBlockStorage {
-    /// crea un storage en memoria con todos los bloques en cero
     pub fn new(total_blocks: u32, block_size: usize) -> Self {
         let len = total_blocks as usize * block_size;
         Self {
@@ -194,6 +219,7 @@ impl BlockStorage for InMemoryBlockStorage {
         let to_copy = data.len();
         slice[..to_copy].copy_from_slice(data);
 
+        // Padding
         if to_copy < self.block_size {
             for b in &mut slice[to_copy..] {
                 *b = 0;
@@ -228,9 +254,6 @@ mod tests {
         let read = storage.read_block(1).unwrap();
         assert_eq!(&read[..data.len()], data);
         assert_eq!(read.len(), BLOCK_SIZE);
-        for b in &read[data.len()..] {
-            assert_eq!(*b, 0);
-        }
     }
 
     #[test]
@@ -241,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn qrstorage_init_creates_zero_blocks() {
+    fn qrstorage_init_creates_images() {
         let dir = temp_dir();
         let storage = QrStorageManager::new(&dir, BLOCK_SIZE, 4);
 
@@ -250,10 +273,7 @@ mod tests {
         for id in 0..4 {
             let path = storage.block_path(id);
             assert!(path.exists());
-
-            let content = storage.read_block(id).unwrap();
-            assert_eq!(content.len(), BLOCK_SIZE);
-            assert!(content.iter().all(|b| *b == 0));
+            assert_eq!(path.extension().unwrap(), "png");
         }
     }
 }

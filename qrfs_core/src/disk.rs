@@ -1,11 +1,11 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// identificador de bloque
 pub type BlockId = u32;
 
 /// tamaño fijo del bloque logico
-pub const BLOCK_SIZE: usize = 4096;
+pub const BLOCK_SIZE: usize = 512; //512 para que sea posible leerlos en 200x200 como dijo el profe en clase
 
 /// numero magico qrfs
 pub const QRFS_MAGIC: u32 = 0x5152_4653;
@@ -94,25 +94,33 @@ pub struct Superblock {
 
 impl Superblock {
     pub fn new(total_blocks: u32, inode_count: u32) -> Self {
-        // bloque 0 es el superblock
+        // Bloque 0 siempre es Superblock
+        let block_size = BLOCK_SIZE as u32;
         let free_map_start = 1;
 
-        // bitmap ocupa ceil(total_blocks / 4096*8)
-        // pero para simplificar usamos 1 bloque siempre
+        // Bitmap: 1 bloque de 512 bytes tiene 4096 bits -> cubre 4096 bloques
+        // Para este proyecto es suficiente 1 bloque de mapa siempre.
         let free_map_blocks = 1;
 
         let inode_table_start = free_map_start + free_map_blocks;
 
-        // decidimos que cada inodo ocupa 256 bytes aprox (bincode)
-        // aqui no calculamos exacto, sino 1 bloque fijo mientras
-        let inode_table_blocks = 1;
+        // --- CORRECCIÓN AQUÍ ---
+        // Calculamos cuántos bloques necesitamos para los inodos.
+        // Un inodo vacío serializado con bincode pesa aprox 50-60 bytes.
+        // Asumimos 80 bytes por seguridad.
+        let bytes_per_inode = 80;
+        let total_inode_bytes = inode_count * bytes_per_inode;
+
+        // División techo (ceiling division) para asegurar que quepan
+        let inode_table_blocks = (total_inode_bytes + block_size - 1) / block_size;
+        // -----------------------
 
         let data_block_start = inode_table_start + inode_table_blocks;
 
         Self {
             magic: QRFS_MAGIC,
             version: QRFS_VERSION,
-            block_size: BLOCK_SIZE as u32,
+            block_size,
             total_blocks,
             free_map_start,
             free_map_blocks,
