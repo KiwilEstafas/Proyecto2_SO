@@ -206,7 +206,7 @@
 ## FASE 5 — Montaje del FS (mount)
 - [X] Abrir archivo QRFS
 - [X] Leer y validar Superblock 
-- [X] Cargar bitmap a memoria (Sin hacer por el momento, porque no lo ocupe para leer, pero si se ocupa para escribir!)
+- [X] Cargar bitmap a memoria 
 - [X] Cargar tabla de inodos 
 - [X] Cargar directorio raíz
 - [X] Construir estructura `QrfsFilesystem` en memoria
@@ -217,13 +217,13 @@
 ### Operaciones obligatorias
 - [X] `getattr` — obtener metadata
 - [X] `create` — crear un archivo vacío
-- [ ] `open` — abrir archivo
-- [ ] `read` — leer bytes desde bloques
-- [ ] `write` — escribir bytes en los bloques del archivo
-- [ ] `rename` — renombrar archivo o directorio
-- [ ] `rmdir` — borrar directorios (vacíos)
+- [X] `open` — abrir archivo
+- [X] `read` — leer bytes desde bloques
+- [X] `write` — escribir bytes en los bloques del archivo
+- [X] `rename` — renombrar archivo o directorio
+- [X] `rmdir` — borrar directorios (vacíos) (cREO QUE BORRA TODS)
 - [X] `statfs` — estadísticas del FS
-- [ ] `fsync` — forzar escritura a disco
+- [X] `fsync` — forzar escritura a disco (Se hace automaticamente en write, entonces solo devuelve ok)
 - [X] `access` — validar permisos
 
 ### Operaciones opcionales
@@ -242,16 +242,16 @@
 
 ## FASE 8 — Generación de códigos QR
 
- - [ ] Elegir la librería de generación QR en Rust (qrcode, qrcode-generator, qr_code o similar)
+ - [X] Elegir la librería de generación QR en Rust (qrcode, qrcode-generator, qr_code o similar)
  - [ ] Crear módulo nuevo qr dentro de qrfs_core
  - [ ] Implementar función:
-   - [ ] encode_block_to_qr(block_bytes) -> QrImage
+   - [X] encode_block_to_qr(block_bytes) -> QrImage
  - [ ] Implementar función CLI en qrfs_cli:
    - [ ] qrfs qr <path_archivo> --out ./qr_output/
- - [ ] Leer el archivo desde el FS montado
-   - [ ] Obtener lista de bloques del archivo
-   - [ ] Convertir cada bloque → QR
- - [ ] Guardar QR como PNG en una carpeta de salida
+ - [X] Leer el archivo desde el FS montado
+   - [X] Obtener lista de bloques del archivo
+   - [X] Convertir cada bloque → QR
+ - [X] Guardar QR como PNG en una carpeta de salida
  - [ ] Validar:
    - [ ] Nombre correlativo (block_0001.png)
    - [ ] Manejo correcto de archivos grandes

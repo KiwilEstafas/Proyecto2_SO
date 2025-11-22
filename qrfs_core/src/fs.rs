@@ -147,6 +147,62 @@ impl<B: BlockStorage + 'static> QrfsFilesystem<B> {
         }
         None
     }
+
+    // Guardar el bitmap al disco
+    fn save_bitmap(&self) -> Result<(), crate::errors::QrfsError> {
+        let block_size = self.superblock.block_size as usize;
+        let start_block = self.superblock.free_map_start;
+        let num_blocks = self.superblock.free_map_blocks;
+
+        let mut offset = 0;
+        for i in 0..num_blocks {
+            let block_id = start_block + i;
+            let mut chunk = vec![0u8; block_size];
+
+            if offset < self.bitmap.len() {
+                let end = std::cmp::min(offset + block_size, self.bitmap.len());
+                let slice = &self.bitmap[offset..end];
+                chunk[..slice.len()].copy_from_slice(slice);
+                offset += slice.len();
+            }
+
+            // Escribir al Storage (esto genera el QR nuevo)
+            self.storage.write_block(block_id, &chunk)?;
+        }
+
+        Ok(())
+    }
+
+    // Busca un bit libre en el bitmap y lo marca como usado
+    fn allocate_block(&mut self) -> Option<u32> {
+        let total_blocks = self.superblock.total_blocks as usize;
+
+        for (byte_idx, byte) in self.bitmap.iter_mut().enumerate() {
+            if *byte == 0xFF {
+                continue;
+            } // Byte lleno
+
+            for bit_idx in 0..8 {
+                let global_id = byte_idx * 8 + bit_idx;
+
+                // No podemos asignar bloques reservados (Superblock, Bitmap, Inodos)
+                // ni bloques fuera del rango total.
+                if global_id < self.superblock.data_block_start as usize {
+                    continue;
+                }
+                if global_id >= total_blocks {
+                    return None;
+                }
+
+                if (*byte & (1 << bit_idx)) == 0 {
+                    // Encontramos uno libre! Lo marcamos.
+                    *byte |= 1 << bit_idx;
+                    return Some(global_id as u32);
+                }
+            }
+        }
+        None
+    }
 }
 
 impl<B: BlockStorage + 'static> Filesystem for QrfsFilesystem<B> {
@@ -352,6 +408,26 @@ impl<B: BlockStorage + 'static> Filesystem for QrfsFilesystem<B> {
         );
     }
 
+    fn open(&mut self, _req: &Request, ino: u64, _flags: i32, reply: fuser::ReplyOpen) {
+        println!("DEBUG: open solicitado para inodo {}", ino);
+
+        // Mapeamos el inodo de FUSE (1) al nuestro (0)
+        let target = if ino == 1 {
+            self.superblock.root_inode
+        } else {
+            ino as u32
+        };
+
+        if self.inodes.contains_key(&target) {
+            // Respondemos éxito.
+            // El primer '0' es el File Handle (no usamos handles complejos).
+            // El segundo '0' son flags internos.
+            reply.opened(0, 0);
+        } else {
+            reply.error(ENOENT);
+        }
+    }
+
     fn setattr(
         &mut self,
         _req: &Request,
@@ -488,5 +564,255 @@ impl<B: BlockStorage + 'static> Filesystem for QrfsFilesystem<B> {
 
         println!("DEBUG: Archivo creado con Inodo ID {}", new_id);
         std::io::stdout().flush().unwrap();
+    }
+
+    // Escribir datos dentro de un archivo
+    fn write(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        _fh: u64,
+        offset: i64,
+        data: &[u8],
+        _write_flags: u32,
+        _flags: i32,
+        _lock_owner: Option<u64>,
+        reply: fuser::ReplyWrite,
+    ) {
+        println!(
+            "DEBUG: write solicitado en inodo {} offset {} len {}",
+            ino,
+            offset,
+            data.len()
+        );
+        std::io::stdout().flush().unwrap();
+
+        let target = if ino == 1 {
+            self.superblock.root_inode
+        } else {
+            ino as u32
+        };
+        let block_size = BLOCK_SIZE as u64;
+
+        // --- CORRECCIÓN: Calculamos las variables AQUÍ (alcance global de la función) ---
+        let offset_in_block = (offset as u64) % block_size;
+        let needed_logical_idx = (offset as u64) / block_size;
+        // -----------------------------------------------------------------------------
+
+        // Verificamos si el inodo existe antes de empezar
+        let current_blocks = if let Some(inode) = self.inodes.get(&target) {
+            inode.blocks.clone()
+        } else {
+            reply.error(libc::ENOENT);
+            return;
+        };
+
+        // PASO A: Verificar si necesitamos asignar bloques nuevos
+        // Usamos una copia local de los bloques para modificarlos
+        let mut new_block_list = current_blocks;
+
+        while (new_block_list.len() as u64) <= needed_logical_idx {
+            // Asignar bloque físico
+            if let Some(phys_id) = self.allocate_block() {
+                println!(
+                    "DEBUG: Asignado bloque físico {} para archivo {}",
+                    phys_id, ino
+                );
+                new_block_list.push(phys_id);
+
+                // Guardar bitmap actualizado inmediatamente
+                let _ = self.save_bitmap();
+            } else {
+                reply.error(libc::ENOSPC); // Disco lleno
+                return;
+            }
+        }
+
+        // PASO B: Escribir los datos al bloque físico
+        let physical_block_id = new_block_list[needed_logical_idx as usize];
+
+        // Leemos lo que hay (Read-Modify-Write)
+        let mut block_data = match self.storage.read_block(physical_block_id) {
+            Ok(d) => d,
+            Err(_) => vec![0u8; BLOCK_SIZE], // Si falla, asumimos ceros
+        };
+
+        // Copiamos los datos nuevos sobre el buffer
+        // offset_in_block ahora sí es visible aquí
+        let end_in_block = std::cmp::min(offset_in_block as usize + data.len(), BLOCK_SIZE);
+        let len_to_write = end_in_block - offset_in_block as usize;
+
+        block_data[offset_in_block as usize..end_in_block].copy_from_slice(&data[..len_to_write]);
+
+        // Guardamos el bloque de DATOS (Genera el QR de contenido)
+        if let Err(e) = self.storage.write_block(physical_block_id, &block_data) {
+            println!("Error escribiendo datos: {}", e);
+            reply.error(libc::EIO);
+            return;
+        }
+
+        // PASO C: Actualizar metadatos del inodo (Tamaño y lista de bloques)
+        if let Some(inode) = self.inodes.get_mut(&target) {
+            inode.blocks = new_block_list; // Actualizamos la lista con los nuevos bloques
+
+            let new_end = offset as u64 + len_to_write as u64;
+            if new_end > inode.size {
+                inode.size = new_end;
+            }
+
+            // Guardamos la tabla de inodos actualizada
+            let _ = self.save_inode_table();
+        }
+
+        reply.written(len_to_write as u32);
+        println!("DEBUG: Escritos {} bytes en inodo {}", len_to_write, target);
+        std::io::stdout().flush().unwrap();
+    }
+
+    fn read(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        _fh: u64,
+        offset: i64,
+        size: u32,
+        _flags: i32,
+        _lock_owner: Option<u64>,
+        reply: fuser::ReplyData,
+    ) {
+        let target = if ino == 1 {
+            self.superblock.root_inode
+        } else {
+            ino as u32
+        };
+        let block_size = BLOCK_SIZE as u64;
+
+        // 1. Obtener inodo
+        if let Some(inode) = self.inodes.get(&target) {
+            // Validar lectura más allá del final del archivo
+            if offset as u64 >= inode.size {
+                reply.data(&[]);
+                return;
+            }
+
+            let mut data_buffer = Vec::new();
+            let mut current_offset = offset as u64;
+            let end_offset = std::cmp::min(inode.size, offset as u64 + size as u64);
+
+            // 2. Leer bloques necesarios
+            while current_offset < end_offset {
+                let logical_block_idx = current_offset / block_size;
+                let offset_in_block = (current_offset % block_size) as usize;
+
+                // Calcular cuánto leer de este bloque
+                let remaining_in_file = end_offset - current_offset;
+                let remaining_in_block = (block_size as u64) - (offset_in_block as u64);
+                let len_to_read = std::cmp::min(remaining_in_file, remaining_in_block) as usize;
+
+                // Obtener ID físico
+                if (logical_block_idx as usize) < inode.blocks.len() {
+                    let phys_id = inode.blocks[logical_block_idx as usize];
+
+                    // LEER DEL DISCO (Aquí ocurre la magia QR -> Base64 -> Bytes)
+                    match self.storage.read_block(phys_id) {
+                        Ok(block_data) => {
+                            // Extraer el pedazo que necesitamos
+                            if block_data.len() >= offset_in_block + len_to_read {
+                                data_buffer.extend_from_slice(
+                                    &block_data[offset_in_block..offset_in_block + len_to_read],
+                                );
+                            } else {
+                                // Si el bloque está corrupto o corto, rellenamos ceros
+                                data_buffer.extend(vec![0u8; len_to_read]);
+                            }
+                        }
+                        Err(_) => {
+                            // Error de lectura física
+                            reply.error(libc::EIO);
+                            return;
+                        }
+                    }
+                } else {
+                    // Si el archivo dice ser grande pero no tiene bloque asignado (Sparse file)
+                    data_buffer.extend(vec![0u8; len_to_read]);
+                }
+
+                current_offset += len_to_read as u64;
+            }
+
+            // 3. Responder
+            reply.data(&data_buffer);
+        } else {
+            reply.error(libc::ENOENT);
+        }
+    }
+
+    fn rename(
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &OsStr,
+        _newparent: u64,
+        newname: &OsStr,
+        _flags: u32,
+        reply: fuser::ReplyEmpty,
+    ) {
+        // Solo soportamos operaciones en root
+        if parent != 1 {
+            reply.error(ENOENT);
+            return;
+        }
+
+        let name_str = name.to_str().unwrap().to_string();
+        let new_name_str = newname.to_str().unwrap().to_string();
+
+        // Si existe el nombre, lo sacamos y lo volvemos a meter con la nueva clave
+        if let Some(inode_id) = self.dir_cache.remove(&name_str) {
+            self.dir_cache.insert(new_name_str, inode_id);
+            println!(
+                "DEBUG: Renombrado '{}' a '{}'",
+                name_str,
+                newname.to_str().unwrap()
+            );
+            reply.ok();
+        } else {
+            reply.error(ENOENT);
+        }
+    }
+
+    fn rmdir(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: fuser::ReplyEmpty) {
+        if parent != 1 {
+            reply.error(ENOENT);
+            return;
+        }
+        let name_str = name.to_str().unwrap().to_string();
+
+        if let Some(inode_id) = self.dir_cache.remove(&name_str) {
+            // 1. Borrar inodo de memoria
+            if let Some(inode) = self.inodes.remove(&inode_id) {
+                // Opcional: Aquí podrías marcar los bloques como libres en el bitmap
+                // Pero para este proyecto, con borrarlo del mapa basta.
+                println!("DEBUG: Borrado archivo '{}' (Inodo {})", name_str, inode_id);
+            }
+
+            // 2. Guardar tabla de inodos actualizada (sin el inodo borrado)
+            let _ = self.save_inode_table();
+
+            reply.ok();
+        } else {
+            reply.error(ENOENT);
+        }
+    }
+
+    fn fsync(
+        &mut self,
+        _req: &Request,
+        _ino: u64,
+        _fh: u64,
+        _datasync: bool,
+        reply: fuser::ReplyEmpty,
+    ) {
+        // Nosotras guardamos todo de una en write, así que solo respondemos ok.
+        reply.ok();
     }
 }
