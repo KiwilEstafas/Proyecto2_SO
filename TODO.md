@@ -206,7 +206,7 @@
 ## FASE 5 — Montaje del FS (mount)
 - [X] Abrir archivo QRFS
 - [X] Leer y validar Superblock 
-- [] Cargar bitmap a memoria (Sin hacer por el momento, porque no lo ocupe para leer, pero si se ocupa para escribir!)
+- [X] Cargar bitmap a memoria (Sin hacer por el momento, porque no lo ocupe para leer, pero si se ocupa para escribir!)
 - [X] Cargar tabla de inodos 
 - [X] Cargar directorio raíz
 - [X] Construir estructura `QrfsFilesystem` en memoria
@@ -215,20 +215,20 @@
 ## FASE 6 — Implementación REAL de las operaciones FUSE
 
 ### Operaciones obligatorias
-- [ ] `getattr` — obtener metadata
-- [ ] `create` — crear un archivo vacío
+- [X] `getattr` — obtener metadata
+- [X] `create` — crear un archivo vacío
 - [ ] `open` — abrir archivo
 - [ ] `read` — leer bytes desde bloques
 - [ ] `write` — escribir bytes en los bloques del archivo
 - [ ] `rename` — renombrar archivo o directorio
 - [ ] `rmdir` — borrar directorios (vacíos)
-- [ ] `statfs` — estadísticas del FS
+- [X] `statfs` — estadísticas del FS
 - [ ] `fsync` — forzar escritura a disco
-- [ ] `access` — validar permisos
+- [X] `access` — validar permisos
 
 ### Operaciones opcionales
 - [ ] `mkdir` — crear directorio
-- [ ] `readdir` — listar contenido de un directorio
+- [X] `readdir` — listar contenido de un directorio
 - [ ] `opendir` — abrir directorio
 
 ## FASE 7 — fsck (verificación del FS)

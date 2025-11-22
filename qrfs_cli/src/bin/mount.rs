@@ -24,8 +24,8 @@ fn run() -> Result<(), QrfsError> {
     let mountpoint = &args[2];
 
     // Asegúrate que estos valores sean iguales a los usados en mkfs
-    let block_size = 256; 
-    let total_blocks = 100; 
+    let block_size = 128; 
+    let total_blocks = 400; 
 
     let storage = QrStorageManager::new(qrfolder, block_size, total_blocks);
     let fs = QrfsFilesystem::new(Arc::new(storage))?;
