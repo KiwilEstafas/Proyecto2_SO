@@ -1,0 +1,85 @@
+# rust compiled files
+/target/
+**/target/
+
+# cargo lock para binarios (comentar si es libreria)
+Cargo.lock
+
+# archivos temporales de rust
+**/*.rs.bk
+*.pdb
+
+# directorios de montaje
+mnt/
+mount/
+mountpoint/
+
+# discos qrfs de prueba
+disco_qr/
+test_disk/
+test_fsck/
+corrupt_test/
+demo_persist/
+*_test/
+*.qrfs/
+
+# archivos qr individuales de prueba
+*.png
+!docs/*.png
+!examples/*.png
+
+# archivos temporales del sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ide y editores
+.vscode/
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# logs
+*.log
+logs/
+
+# archivos de backup
+*.bak
+*.backup
+*.old
+
+# archivos de sistema linux
+.fuse_hidden*
+
+# directorios de compilacion alternativa
+debug/
+release/
+
+# archivos de profiling
+*.prof
+perf.data
+perf.data.old
+flamegraph.svg
+
+# archivos de coverage
+*.profraw
+*.profdata
+cobertura.html
+tarpaulin-report.html
+lcov.info
+
+# archivos temporales de pruebas
+tmp/
+temp/
+test_output/
+
+# archivos de configuracion local
+.env
+.env.local
+config.local.toml

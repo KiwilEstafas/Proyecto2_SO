@@ -232,13 +232,13 @@
 - [ ] `opendir` — abrir directorio
 
 ## FASE 7 — fsck (verificación del FS)
-- [ ] Confirmar validez del superblock
-- [ ] Revisar coherencia del bitmap
-- [ ] Validar inodos
-- [ ] Confirmar existencia del root directory
-- [ ] Validar que bloques usados estén asignados correctamente
-- [ ] Reportar errores menores
-- [ ] Reportar errores críticos
+- [X] Confirmar validez del superblock
+- [X] Revisar coherencia del bitmap
+- [X] Validar inodos
+- [X] Confirmar existencia del root directory
+- [X] Validar que bloques usados estén asignados correctamente
+- [X] Reportar errores menores
+- [X] Reportar errores críticos
 
 ## FASE 8 — Generación de códigos QR
 
