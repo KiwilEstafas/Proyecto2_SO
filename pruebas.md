@@ -291,7 +291,270 @@ cargo run --bin fsck -- test_fsck
 
 ---
 
-## PARTE 3: Nota Importante sobre Persistencia (Para la defensa)
+## PARTE 3: Pruebas de Extraccion de Codigos QR (qr_extract)
+
+### Prueba A: Listar Archivos Disponibles
+
+**1. Crear filesystem con archivos:**
+```bash
+rm -rf test_qr
+cargo run --bin mkfs -- --output test_qr --blocks 400
+cargo run --bin mount -- test_qr mnt &
+sleep 2
+
+echo "archivo pequenio" > mnt/pequenio.txt
+echo "archivo mediano con mas contenido para probar" > mnt/mediano.txt
+
+fusermount -u mnt
+```
+
+**2. Listar archivos con qr_extract:**
+```bash
+cargo run --bin qr_extract -- test_qr list --out ./salida_test/
+```
+
+✅ **Esperado:**
+```
+qrfs qr: archivos disponibles en el filesystem:
+
+  inodo 0: directorio (0 bloques, 0 bytes)
+  inodo 2: archivo (1 bloques, 128 bytes)
+  inodo 3: archivo (1 bloques, 128 bytes)
+
+qrfs qr: error: especifica el id del inodo a extraer (ej: qr_extract test_qr 2 --out ./salida_test/)
+```
+
+**Nota:** El "error" es intencional. `list` solo muestra archivos, no extrae.
+
+---
+
+### Prueba B: Extraer QR de un Archivo Pequeño
+
+**1. Extraer bloques del inodo 2:**
+```bash
+cargo run --bin qr_extract -- test_qr 2 --out ./qr_pequenio/
+```
+
+✅ **Esperado:**
+```
+qrfs qr: extrayendo bloques de '2' a './qr_pequenio/'
+qrfs qr: encontrado inodo 2 con 1 bloques
+
+========================================
+extraccion completada:
+  bloques extraidos: 1
+  bloques con error: 0
+  tamanio total: 128 bytes
+  directorio: ./qr_pequenio/
+========================================
+```
+
+**2. Verificar archivos generados:**
+```bash
+ls -lh qr_pequenio/
+```
+
+✅ **Esperado:**
+```
+total 4.0K
+-rw-r--r-- 1 usuario usuario 2.4K Nov 24 16:09 block_0000.png
+```
+
+**3. Validar nombre correlativo:**
+El archivo debe llamarse exactamente `block_0000.png` (con ceros al inicio).
+
+---
+
+### Prueba C: Extraer QR de Archivo con Multiples Bloques
+
+**1. Crear archivo grande:**
+```bash
+rm -rf test_qr_grande
+cargo run --bin mkfs -- --output test_qr_grande --blocks 400
+cargo run --bin mount -- test_qr_grande mnt &
+sleep 2
+
+# crear archivo con contenido que ocupe varios bloques
+for i in {1..10}; do
+  echo "Linea $i del archivo grande con contenido suficiente para ocupar varios bloques en el filesystem" >> mnt/grande.txt
+done
+
+fusermount -u mnt
+```
+
+**2. Extraer bloques:**
+```bash
+cargo run --bin qr_extract -- test_qr_grande 2 --out ./qr_grande/
+```
+
+✅ **Esperado:**
+```
+qrfs qr: extrayendo bloques de '2' a './qr_grande/'
+qrfs qr: encontrado inodo 2 con 7 bloques
+
+qrfs qr: extraidos 7 de 7 bloques...
+
+========================================
+extraccion completada:
+  bloques extraidos: 7
+  bloques con error: 0
+  tamanio total: 896 bytes
+  directorio: ./qr_grande/
+========================================
+```
+
+**3. Verificar multiples archivos QR:**
+```bash
+ls -lh qr_grande/
+```
+
+✅ **Esperado:**
+```
+total 28K
+-rw-r--r-- 1 usuario usuario 2.4K Nov 24 16:15 block_0000.png
+-rw-r--r-- 1 usuario usuario 2.4K Nov 24 16:15 block_0001.png
+-rw-r--r-- 1 usuario usuario 2.4K Nov 24 16:15 block_0002.png
+-rw-r--r-- 1 usuario usuario 2.4K Nov 24 16:15 block_0003.png
+-rw-r--r-- 1 usuario usuario 2.4K Nov 24 16:15 block_0004.png
+-rw-r--r-- 1 usuario usuario 2.4K Nov 24 16:15 block_0005.png
+-rw-r--r-- 1 usuario usuario 2.4K Nov 24 16:15 block_0006.png
+```
+
+**4. Validar nombres correlativos:**
+Los archivos deben estar numerados secuencialmente desde `block_0000.png` hasta `block_0006.png`.
+
+---
+
+### Prueba D: Manejo de Archivos Grandes (Advertencia)
+
+**1. Crear archivo muy grande:**
+```bash
+rm -rf test_qr_muy_grande
+cargo run --bin mkfs -- --output test_qr_muy_grande --blocks 400
+cargo run --bin mount -- test_qr_muy_grande mnt &
+sleep 2
+
+# crear archivo con muchos bloques (>100)
+for i in {1..150}; do
+  echo "Bloque $i con contenido para generar archivo grande" >> mnt/muy_grande.txt
+done
+
+fusermount -u mnt
+```
+
+**2. Intentar extraer:**
+```bash
+cargo run --bin qr_extract -- test_qr_muy_grande 2 --out ./qr_muy_grande/
+```
+
+✅ **Esperado:**
+```
+qrfs qr: extrayendo bloques de '2' a './qr_muy_grande/'
+qrfs qr: encontrado inodo 2 con 120 bloques
+qrfs qr: advertencia: archivo grande (120 bloques)
+qrfs qr: tamanio estimado de salida: ~1200 kb
+
+qrfs qr: extraidos 10 de 120 bloques...
+qrfs qr: extraidos 20 de 120 bloques...
+...
+qrfs qr: extraidos 120 de 120 bloques...
+
+========================================
+extraccion completada:
+  bloques extraidos: 120
+  bloques con error: 0
+  tamanio total: 15360 bytes
+  directorio: ./qr_muy_grande/
+========================================
+```
+
+**Validacion:** El sistema debe mostrar advertencia cuando el archivo tiene >100 bloques.
+
+---
+
+### Prueba E: Verificacion de Contenido QR
+
+**1. Crear archivo con contenido conocido:**
+```bash
+rm -rf test_qr_verificacion
+cargo run --bin mkfs -- --output test_qr_verificacion --blocks 400
+cargo run --bin mount -- test_qr_verificacion mnt &
+sleep 2
+
+echo "contenido para verificar QR" > mnt/verificar.txt
+
+fusermount -u mnt
+```
+
+**2. Extraer y verificar:**
+```bash
+cargo run --bin qr_extract -- test_qr_verificacion 2 --out ./qr_verificacion/
+```
+
+✅ **Esperado:**
+El proceso de extraccion valida automaticamente cada QR generado usando `validate_qr_block()`. 
+Si algun QR no puede ser validado, se mostrara una advertencia pero no detendra el proceso.
+
+**3. Verificar que el QR es legible:**
+Puedes escanear el QR generado con tu telefono. Debe mostrar el contenido en Base64.
+
+---
+
+### Prueba F: Manejo de Errores
+
+**1. Intentar extraer inodo inexistente:**
+```bash
+cargo run --bin qr_extract -- test_qr 999 --out ./qr_error/
+```
+
+❌ **Esperado:**
+```
+qrfs qr: extrayendo bloques de '999' a './qr_error/'
+qrfs qr: error: other error: inodo 999 no encontrado
+```
+
+**2. Intentar extraer de filesystem inexistente:**
+```bash
+cargo run --bin qr_extract -- filesystem_no_existe 2 --out ./qr_error/
+```
+
+❌ **Esperado:**
+Error al leer el superblock o bloques del filesystem.
+
+---
+
+### Resumen de Validaciones de qr_extract
+
+**✅ Validaciones implementadas:**
+
+1. **Nombres correlativos:**
+   - Formato: `block_0000.png`, `block_0001.png`, etc.
+   - Numeracion secuencial desde 0
+   - Ceros de padding (4 digitos)
+
+2. **Manejo de archivos grandes:**
+   - Advertencia si archivo tiene >100 bloques
+   - Estimacion de tamanio de salida
+   - Progreso cada 10 bloques
+
+3. **Verificacion de contenido QR:**
+   - Cada QR se valida con `validate_qr_block()`
+   - Se reportan QR que no pueden decodificarse
+   - Contador de errores en resumen final
+
+**✅ Funcionalidades verificadas:**
+- Busqueda por ID de inodo
+- Listado de archivos disponibles
+- Extraccion de archivos con un bloque
+
+**Falta verificar estas:**
+- Extraccion de archivos con multiples bloques
+- Manejo de archivos muy grandes
+- Reporte detallado de errores
+
+---
+
+## PARTE 4: Nota Importante sobre Persistencia (Para la defensa)
 
 *   **El sistema es persistente FISICAMENTE:** Los QRs (Inodos y Datos) se guardan en disco y son permanentes.
 *   **El sistema es volatil en NOMBRES:** Como usamos `dir_cache` (un HashMap en RAM) para guardar los nombres de los archivos (`hola.txt` -> Inodo 2), **si apagamos el `mount` y lo vuelvemos a encender luego, los archivos seguiran en el disco (los PNGs existen), pero el `ls` saldra vacio** porque la RAM se borro y perdimos la asociacion Nombre-Inodo.
@@ -327,6 +590,10 @@ ls -la mnt/  # solo muestra . y ..
 # pero fsck confirma que los datos existen
 fusermount -u mnt
 cargo run --bin fsck -- demo_persist  # muestra inodos y bloques usados
+
+# y qr_extract puede extraer los datos
+cargo run --bin qr_extract -- demo_persist 2 --out ./recuperado/
+# los datos siguen ahi!
 ```
 
 **Por que pasa:**
@@ -335,9 +602,12 @@ cargo run --bin fsck -- demo_persist  # muestra inodos y bloques usados
 - Al remontar, `dir_cache` se inicializa vacio
 - Solucion futura: guardar el dir_cache en un bloque especial del disco
 
+**Solucion temporal con qr_extract:**
+Aunque `ls` no muestre los archivos despues de remontar, puedes usar `qr_extract` con `list` para ver que inodos existen y extraer sus datos.
+
 ---
 
-## PARTE 4: Resumen de Funcionalidades Probadas
+## PARTE 5: Resumen de Funcionalidades Probadas
 
 ### Operaciones FUSE Funcionando:
 - ✅ `statfs` - estadisticas del filesystem
@@ -355,12 +625,15 @@ cargo run --bin fsck -- demo_persist  # muestra inodos y bloques usados
 - ✅ `mkfs` - formatear disco con QRs
 - ✅ `mount` - montar filesystem via FUSE
 - ✅ `fsck` - verificar integridad completa
+- ✅ `qr_extract` - extraer bloques QR de archivos
 
 ### Sistema de QR Funcionando:
 - ✅ Conversion Bytes -> Base64 -> QR -> PNG
 - ✅ Conversion PNG -> QR -> Base64 -> Bytes
 - ✅ Almacenamiento persistente en disco
 - ✅ Lectura robusta con rqrr
+- ✅ Extraccion de bloques a carpeta externa
+- ✅ Validacion automatica de contenido QR
 
 ### Limitaciones Conocidas:
 - ⚠️ Dir_cache volatil (nombres no persisten entre montajes)

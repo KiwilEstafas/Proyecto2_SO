@@ -243,34 +243,34 @@
 ## FASE 8 — Generación de códigos QR
 
  - [X] Elegir la librería de generación QR en Rust (qrcode, qrcode-generator, qr_code o similar)
- - [ ] Crear módulo nuevo qr dentro de qrfs_core
- - [ ] Implementar función:
+ - [X] Crear módulo nuevo qr dentro de qrfs_core
+ - [X] Implementar función:
    - [X] encode_block_to_qr(block_bytes) -> QrImage
- - [ ] Implementar función CLI en qrfs_cli:
-   - [ ] qrfs qr <path_archivo> --out ./qr_output/
+ - [X] Implementar función CLI en qrfs_cli:
+   - [X] qrfs qr <path_archivo> --out ./qr_output/
  - [X] Leer el archivo desde el FS montado
    - [X] Obtener lista de bloques del archivo
    - [X] Convertir cada bloque → QR
  - [X] Guardar QR como PNG en una carpeta de salida
- - [ ] Validar:
-   - [ ] Nombre correlativo (block_0001.png)
-   - [ ] Manejo correcto de archivos grandes
-   - [ ] Verificación de contenido QR
+ - [X] Validar:
+   - [X] Nombre correlativo (block_0001.png)
+   - [X] Manejo correcto de archivos grandes
+   - [X] Verificación de contenido QR
 
-## FASE 8 — Integración CLI
+## FASE 9 — Integración CLI
 - [ ] `qrfs mkfs disk.qrfs --size 10MB`
 - [ ] `qrfs mount disk.qrfs /mnt/qrfs`
 - [ ] `qrfs fsck disk.qrfs`
 - [ ] Mensajes de error claros y consistentes
 - [ ] Logging básico
 
-## FASE 9 — Pruebas
+## FASE 10 — Pruebas
 - [ ] Unit tests: inodos, bitmap, directorios
 - [ ] Tests de integración: mkfs + mount + fuse
 - [ ] Tests de `read/write`
 - [ ] Tests de manejo de errores
 
-## FASE 10 — Pulido
+## FASE 11 — Pulido
 - [ ] Remover warnings
 - [ ] Documentación
 - [ ] Limpiar codigo y comments

@@ -959,6 +959,7 @@ dependencies = [
 name = "qrfs_cli"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "fuse3",
  "qrfs_core",
  "tokio",
