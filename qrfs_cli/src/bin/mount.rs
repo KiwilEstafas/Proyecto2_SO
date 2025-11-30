@@ -15,21 +15,31 @@ fn main() {
 
 fn run() -> Result<(), QrfsError> {
     let args: Vec<String> = env::args().collect();
+    
+    // Sintaxis: mount.qrfs <qrfolder> <mountpoint>
     if args.len() != 3 {
-        eprintln!("Uso: mount.qrfs <carpeta_qr> <punto_montaje>");
+        eprintln!("Uso: mount.qrfs <qrfolder/> <mountpoint/>");
         return Ok(());
     }
 
     let qrfolder = &args[1];
     let mountpoint = &args[2];
 
-    // Asegúrate que estos valores sean iguales a los usados en mkfs
+    println!("mount.qrfs: Montando '{}' en '{}'...", qrfolder, mountpoint);
+
+    // Configuración estándar (debe coincidir con mkfs)
     let block_size = 128; 
     let total_blocks = 400; 
 
+    // Inicializar almacenamiento
     let storage = QrStorageManager::new(qrfolder, block_size, total_blocks);
+    
+    // Inicializar Filesystem (esto lee la firma en el Bloque 0)
     let fs = QrfsFilesystem::new(Arc::new(storage))?;
 
+    println!("mount.qrfs: Sistema listo. Presione Ctrl+C para desmontar.");
+    
+    // Montar (bloquea la terminal)
     fs.mount(Path::new(mountpoint))?;
 
     Ok(())

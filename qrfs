@@ -2,68 +2,72 @@
 
 # ==============================================================================
 # QRFS Wrapper Script
-# Este script actúa como interfaz unificada para las herramientas de QRFS.
-# Usa 'cargo run' para asegurar que siempre se ejecute la última versión del código.
+# Interfaz unificada para todas las herramientas del proyecto.
 # ==============================================================================
 
-# Colores para mensajes
+# Colores
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Función de ayuda
+# Función de ayuda actualizada
 show_help() {
     echo -e "${BLUE}QRFS - Quick Response File System CLI${NC}"
     echo "Uso: ./qrfs <comando> [argumentos]"
     echo ""
-    echo "Comandos disponibles:"
-    echo -e "  ${GREEN}mkfs${NC}     Formatear un directorio como QRFS"
-    echo "            Uso: ./qrfs mkfs --output <DIR> [--blocks N]"
+    echo "Comandos Principales (Según PDF):"
+    echo -e "  ${GREEN}mkfs${NC}     Crear un sistema de archivos QRFS"
+    echo "            Uso: ./qrfs mkfs <QR_FOLDER> [--blocks N]"
     echo ""
     echo -e "  ${GREEN}mount${NC}    Montar el sistema de archivos"
-    echo "            Uso: ./qrfs mount <DIR_QR> <PUNTO_MONTAJE>"
+    echo "            Uso: ./qrfs mount <QR_FOLDER> <MOUNTPOINT>"
     echo ""
-    echo -e "  ${GREEN}fsck${NC}     Verificar integridad y reparar errores"
-    echo "            Uso: ./qrfs fsck <DIR_QR>"
+    echo -e "  ${GREEN}fsck${NC}     Chequeo de consistencia"
+    echo "            Uso: ./qrfs fsck <QR_FOLDER>"
     echo ""
-    echo -e "  ${GREEN}qr${NC}       Herramienta de extracción de QRs (qr_extract)"
-    echo "            Uso: ./qrfs qr <DIR_QR> <ID_INODO> --out <SALIDA>"
+    echo "Herramientas Extra:"
+    echo -e "  ${GREEN}server${NC}   Iniciar Lector QR (Web App para el celular)"
+    echo "            Uso: ./qrfs server <CARPETA_DESTINO>"
     echo ""
-    echo -e "  ${GREEN}clean${NC}    Limpiar proyecto (cargo clean) y montajes"
+    echo -e "  ${GREEN}qr${NC}       Extraer QRs a imágenes (qr_extract)"
+    echo "            Uso: ./qrfs qr <QR_FOLDER> <ID_INODO> --out <SALIDA>"
+    echo ""
+    echo -e "  ${GREEN}clean${NC}    Limpiar compilación y montajes pegados"
     echo ""
 }
 
-# Verificar si se pasó un argumento
+# Verificar argumentos
 if [ -z "$1" ]; then
     show_help
     exit 1
 fi
 
 SUBCOMMAND=$1
-shift # Elimina el primer argumento (el comando) para pasar el resto a los binarios
+shift # Sacamos el comando de la lista de argumentos
 
 case "$SUBCOMMAND" in
     mkfs)
-        # Ejecuta el binario mkfs
+        # Sintaxis nueva: directo a la carpeta
         RUST_LOG=info cargo run --quiet --bin mkfs -- "$@"
         ;;
     mount)
-        # Ejecuta el binario mount
-        # Nota: Mount bloquea la terminal, así que no imprimimos mensaje de éxito final
-        echo -e "${BLUE}Montando QRFS... Presiona Ctrl+C para desmontar.${NC}"
+        echo -e "${BLUE}Montando QRFS... (Ctrl+C para salir)${NC}"
         RUST_LOG=info cargo run --quiet --bin mount -- "$@"
         ;;
     fsck)
-        # Ejecuta el binario fsck
         RUST_LOG=info cargo run --quiet --bin fsck -- "$@"
         ;;
+    server)
+        # El servidor web para el celular
+        echo -e "${BLUE}Iniciando servidor lector...${NC}"
+        RUST_LOG=info cargo run --quiet --bin server -- "$@"
+        ;;
     qr|extract)
-        # Ejecuta el binario qr_extract
         RUST_LOG=info cargo run --quiet --bin qr_extract -- "$@"
         ;;
     clean)
-        echo -e "${BLUE}Limpiando proyecto y desconectando montajes...${NC}"
+        echo -e "${BLUE}Limpiando entorno...${NC}"
         fusermount -uz mnt 2>/dev/null
         cargo clean
         echo -e "${GREEN}Listo.${NC}"
@@ -72,7 +76,7 @@ case "$SUBCOMMAND" in
         show_help
         ;;
     *)
-        echo -e "${RED}Error: Comando '$SUBCOMMAND' no reconocido.${NC}"
+        echo -e "${RED}Error: Comando '$SUBCOMMAND' desconocido.${NC}"
         show_help
         exit 1
         ;;
