@@ -1063,4 +1063,32 @@ impl<B: BlockStorage + 'static> Filesystem for QrfsFilesystem<B> {
         // Nosotras guardamos todo de una en write, así que solo respondemos ok.
         reply.ok();
     }
+
+    fn opendir(&mut self, _req: &Request, ino: u64, _flags: i32, reply: fuser::ReplyOpen) {
+        // 1. Mapear inodo FUSE (1) a QRFS (Root)
+        let target = if ino == 1 {
+            self.superblock.root_inode
+        } else {
+            ino as u32
+        };
+
+        // 2. Buscar el inodo
+        if let Some(inode) = self.inodes.get(&target) {
+            // 3. Validar que SEA UN DIRECTORIO
+            match inode.kind {
+                InodeKind::Directory => {
+                    // Éxito: (file_handle=0, flags=0)
+                    reply.opened(0, 0);
+                }
+                InodeKind::File => {
+                    // Error: Intentaron abrir un archivo como si fuera carpeta
+                    println!("DEBUG: Intento de abrir archivo {} como carpeta", target); // Solo imprime si hay error
+                    reply.error(libc::ENOTDIR);
+                }
+            }
+        } else {
+            // Error: No existe
+            reply.error(libc::ENOENT);
+        }
+    }
 }
