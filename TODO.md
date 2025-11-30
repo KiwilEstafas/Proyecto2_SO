@@ -258,6 +258,7 @@
    - [X] Verificación de contenido QR
 
 ## FASE 9 — Integración CLI
+Nota: Cree un scrip t bash simple para probar los comandos juntos por si acaso para el profe. 
 - [X] `qrfs mkfs disk.qrfs --size 10MB`
 - [X] `qrfs mount disk.qrfs /mnt/qrfs`
 - [X] `qrfs fsck disk.qrfs`
