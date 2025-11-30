@@ -5,6 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::disk::DirectoryEntry;
 use crate::disk::{BlockId, Inode, InodeKind, BLOCK_SIZE};
 use crate::errors::QrfsError;
 use crate::storage::BlockStorage;
@@ -70,20 +71,42 @@ impl<B: BlockStorage + 'static> QrfsFilesystem<B> {
             }
         }
 
-        println!("DEBUG: FS Montado. Inodos ocupados: {}, ...", inodes.len());
-        println!(
-            "DEBUG: FS Montado. Inodos: {}, Bitmap bytes: {}",
-            inodes.len(),
-            bitmap.len()
-        );
-
-        Ok(Self {
+        let mut fs = Self {
             storage,
             superblock,
             inodes,
             bitmap,
-            dir_cache: HashMap::new(),
-        })
+            dir_cache: HashMap::new(), // Empieza vacío
+        };
+
+        // Intentar cargar el directorio raíz del disco
+        let root_id = fs.superblock.root_inode;
+        println!("DEBUG: Cargando directorio raíz (Inodo {})...", root_id);
+
+        match fs.load_directory(root_id) {
+            Ok(entries) => {
+                for entry in entries {
+                    // Ignoramos . y .. para el cache en RAM (readdir ya las agrega manualmente)
+                    if entry.name != "." && entry.name != ".." {
+                        fs.dir_cache.insert(entry.name, entry.inode_id);
+                    }
+                }
+                println!(
+                    "DEBUG: Directorio cargado. {} archivos encontrados.",
+                    fs.dir_cache.len()
+                );
+            }
+            Err(e) => {
+                // Si es la primera vez (mkfs recién hecho), el directorio puede estar vacío o corrupto.
+                // No es error fatal, simplemente empezamos vacío.
+                println!(
+                    "DEBUG: No se pudo cargar directorio (normal si es disco nuevo): {}",
+                    e
+                );
+            }
+        }
+
+        Ok(fs)
     }
 
     pub fn mount(self, mountpoint: &Path) -> Result<(), crate::errors::QrfsError> {
@@ -99,21 +122,161 @@ impl<B: BlockStorage + 'static> QrfsFilesystem<B> {
     }
 
     //-----------------HELPER METHODS PARA MANEJO DE INODOS --------------------
+
+    /// Lee los bloques de datos de un inodo (directorio) y devuelve la lista de archivos
+    fn load_directory(
+        &self,
+        inode_id: u32,
+    ) -> Result<Vec<DirectoryEntry>, crate::errors::QrfsError> {
+        // 1. Obtener el inodo
+        let inode = match self.inodes.get(&inode_id) {
+            Some(i) => i,
+            None => return Ok(Vec::new()), // Si no existe, devolvemos lista vacía (seguridad)
+        };
+
+        // 2. Leer todos los bytes de datos
+        let mut raw_data = Vec::new();
+        for &block_id in &inode.blocks {
+            let block = self.storage.read_block(block_id)?;
+            raw_data.extend_from_slice(&block);
+        }
+
+        // 3. Si el archivo está vacío, devolvemos vector vacío
+        if inode.size == 0 || raw_data.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // 4. Recortar al tamaño real (raw_data puede tener ceros de padding al final)
+        let valid_data = &raw_data[..inode.size as usize];
+
+        // 5. Deserializar
+        let entries: Vec<DirectoryEntry> = bincode::deserialize(valid_data).map_err(|_| {
+            crate::errors::QrfsError::Other("Error deserializando directorio".into())
+        })?;
+
+        Ok(entries)
+    }
+
+    /// Guarda la lista actual de archivos (dir_cache) en los bloques del Inodo Raíz
+    fn save_root_directory(&mut self) -> Result<(), crate::errors::QrfsError> {
+        let root_id = self.superblock.root_inode;
+
+        // 1. Convertir el HashMap (cache) a Vector de entradas
+        let mut entries = Vec::new();
+
+        // Entradas estáticas obligatorias
+        entries.push(DirectoryEntry {
+            name: ".".to_string(),
+            inode_id: root_id,
+            kind: InodeKind::Directory,
+        });
+        entries.push(DirectoryEntry {
+            name: "..".to_string(),
+            inode_id: root_id,
+            kind: InodeKind::Directory,
+        });
+
+        // Entradas dinámicas del usuario
+        for (name, &id) in &self.dir_cache {
+            // Buscamos el tipo en la tabla de inodos para guardarlo correctamente
+            let kind = if let Some(inode) = self.inodes.get(&id) {
+                inode.kind.clone()
+            } else {
+                InodeKind::File // Fallback
+            };
+
+            entries.push(DirectoryEntry {
+                name: name.clone(),
+                inode_id: id,
+                kind,
+            });
+        }
+
+        // 2. Serializar a bytes
+        let data = bincode::serialize(&entries)?;
+        let total_size = data.len() as u64;
+
+        // 3. Preparar el inodo Raíz para escritura
+        // (Clonamos bloques para modificarlos si hace falta)
+        let mut current_blocks = self.inodes.get(&root_id).unwrap().blocks.clone();
+
+        // Calcular cuántos bloques necesitamos
+        let block_size = self.superblock.block_size as usize;
+        let needed_blocks = (data.len() + block_size - 1) / block_size;
+
+        // 4. Asignar más bloques si hacen falta
+        while current_blocks.len() < needed_blocks {
+            if let Some(phys_id) = self.allocate_block() {
+                current_blocks.push(phys_id);
+            } else {
+                return Err(crate::errors::QrfsError::Other(
+                    "Disco lleno guardando directorio".into(),
+                ));
+            }
+        }
+        // Nota: Si sobran bloques, idealmente deberíamos liberarlos, pero para FASE 1 lo dejamos así.
+
+        // 5. Escribir datos en los bloques físicos
+        let mut offset = 0;
+        for (i, &block_id) in current_blocks.iter().enumerate() {
+            // Si ya escribimos todos los datos, el resto del bloque (o bloques extra) son ceros
+            let mut chunk = vec![0u8; block_size];
+
+            if offset < data.len() {
+                let end = std::cmp::min(offset + block_size, data.len());
+                let slice = &data[offset..end];
+                chunk[..slice.len()].copy_from_slice(slice);
+                offset += slice.len();
+            }
+
+            self.storage.write_block(block_id, &chunk)?;
+
+            // Optimización: si ya escribimos todo y no hay bloques viejos que limpiar, podríamos parar.
+            // Pero mejor escribimos todo para asegurar consistencia.
+        }
+
+        // 6. Actualizar Bitmap (por si asignamos nuevos bloques)
+        self.save_bitmap()?;
+
+        // 7. Actualizar metadatos del Inodo Raíz
+        if let Some(root_inode) = self.inodes.get_mut(&root_id) {
+            root_inode.blocks = current_blocks;
+            root_inode.size = total_size;
+            // Actualizar fecha de modificación
+            root_inode.modified_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+        }
+
+        // 8. Guardar tabla de inodos (porque modificamos size y blocks del root)
+        self.save_inode_table()?;
+
+        Ok(())
+    }
+
     /// Guarda toda la tabla de inodos de memoria al disco (QRs)
     fn save_inode_table(&self) -> Result<(), crate::errors::QrfsError> {
-        // 1. Convertir el HashMap a un vector ordenado por ID
-        let mut inodes: Vec<&Inode> = self.inodes.values().collect();
-        inodes.sort_by_key(|i| i.id);
-
-        // 2. Serializar todo el vector secuencialmente
+        // 1. Iterar secuencialmente por TODOS los IDs posibles (0..64)
         let mut serialized_data = Vec::new();
-        for inode in inodes {
-            let bytes = bincode::serialize(inode)
+
+        for id in 0..self.superblock.inode_count {
+            // Si el inodo está en memoria, úsalo. Si no, crea uno vacío.
+            let inode_to_write = if let Some(inode) = self.inodes.get(&id) {
+                inode.clone()
+            } else {
+                // Inodo vacío (placeholder) para mantener el alineamiento
+                let mut empty = Inode::new(id, InodeKind::File);
+                empty.mode = 0; // Marcado como libre
+                empty
+            };
+
+            let bytes = bincode::serialize(&inode_to_write)
                 .map_err(|_| crate::errors::QrfsError::Other("Error serializando inodo".into()))?;
             serialized_data.extend_from_slice(&bytes);
         }
 
-        // 3. Escribir en los bloques asignados a la tabla
+        // 2. Escribir en los bloques asignados (El resto es igual a tu código)
         let block_size = self.superblock.block_size as usize;
         let start_block = self.superblock.inode_table_start;
         let num_blocks = self.superblock.inode_table_blocks;
@@ -130,7 +293,6 @@ impl<B: BlockStorage + 'static> QrfsFilesystem<B> {
                 offset += slice.len();
             }
 
-            // Escribir al Storage (esto genera el QR nuevo)
             self.storage.write_block(block_id, &chunk)?;
         }
 
@@ -532,6 +694,11 @@ impl<B: BlockStorage + 'static> Filesystem for QrfsFilesystem<B> {
             println!("DEBUG: Nombre '{}' asociado al Inodo {}", filename, new_id);
         }
 
+        if let Err(e) = self.save_root_directory() {
+            println!("ERROR CRÍTICO: No se pudo persistir el directorio: {}", e);
+            // En un sistema real deberíamos revertir cambios, pero aquí solo loggeamos
+        }
+
         // 4. Guardar en Disco (Actualizar QRs de la tabla)
         if let Err(e) = self.save_inode_table() {
             println!("ERROR guardando inodo: {}", e);
@@ -769,6 +936,7 @@ impl<B: BlockStorage + 'static> Filesystem for QrfsFilesystem<B> {
         // Si existe el nombre, lo sacamos y lo volvemos a meter con la nueva clave
         if let Some(inode_id) = self.dir_cache.remove(&name_str) {
             self.dir_cache.insert(new_name_str, inode_id);
+            let _ = self.save_root_directory();
             println!(
                 "DEBUG: Renombrado '{}' a '{}'",
                 name_str,
@@ -794,10 +962,90 @@ impl<B: BlockStorage + 'static> Filesystem for QrfsFilesystem<B> {
                 // Pero para este proyecto, con borrarlo del mapa basta.
                 println!("DEBUG: Borrado archivo '{}' (Inodo {})", name_str, inode_id);
             }
+            // 2. Guardar cambios en el disco físico
+            if let Err(e) = self.save_root_directory() {
+                println!("ERROR persistiendo rmdir: {}", e);
+            }
 
-            // 2. Guardar tabla de inodos actualizada (sin el inodo borrado)
+            // 3. Guardar tabla de inodos actualizada (sin el inodo borrado)
             let _ = self.save_inode_table();
 
+            reply.ok();
+        } else {
+            reply.error(ENOENT);
+        }
+    }
+
+    // UNLINK: Borrar un archivo regular (rm file.txt)
+    fn unlink(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: fuser::ReplyEmpty) {
+        println!("DEBUG: unlink (rm) solicitado");
+
+        // 1. Validar que estamos en la raíz (parent 1)
+        if parent != 1 {
+            reply.error(ENOENT);
+            return;
+        }
+
+        let name_str = match name.to_str() {
+            Some(s) => s.to_string(),
+            None => {
+                reply.error(ENOENT);
+                return;
+            }
+        };
+
+        // 2. Verificar si el archivo existe en el cache
+        // Obtenemos el ID primero para no mantener prestado el self.dir_cache
+        let inode_id_opt = self.dir_cache.get(&name_str).cloned();
+
+        if let Some(inode_id) = inode_id_opt {
+            // 3. Liberar los bloques usados en el BITMAP
+            if let Some(inode) = self.inodes.get(&inode_id) {
+                for &block_id in &inode.blocks {
+                    let byte_idx = (block_id as usize) / 8;
+                    let bit_idx = (block_id as usize) % 8;
+
+                    // Nos aseguramos de no salirnos del rango
+                    if byte_idx < self.bitmap.len() {
+                        // Apagamos el bit (AND con el complemento)
+                        // Ejemplo: Si bit es 00100000, invertido es 11011111.
+                        // Al hacer AND, ese bit se vuelve 0.
+                        self.bitmap[byte_idx] &= !(1 << bit_idx);
+                    }
+                }
+            } else {
+                // Inconsistencia: está en dir_cache pero no en inodes
+                reply.error(ENOENT);
+                return;
+            }
+
+            // 4. Eliminar de las estructuras en memoria
+            self.inodes.remove(&inode_id);
+            self.dir_cache.remove(&name_str);
+
+            // 5. Guardar cambios en el disco físico
+            if let Err(e) = self.save_root_directory() {
+                println!("ERROR al persistir directorio tras borrado: {}", e);
+            }
+
+            // A. Guardar Bitmap actualizado (para reutilizar espacio)
+            if let Err(e) = self.save_bitmap() {
+                println!("ERROR al guardar bitmap en unlink: {}", e);
+                reply.error(libc::EIO);
+                return;
+            }
+
+            // B. Guardar Tabla de Inodos (para que el archivo desaparezca tras reiniciar)
+            if let Err(e) = self.save_inode_table() {
+                println!("ERROR al guardar tabla de inodos en unlink: {}", e);
+                reply.error(libc::EIO);
+                return;
+            }
+
+            println!(
+                "DEBUG: Archivo '{}' eliminado y espacio liberado.",
+                name_str
+            );
             reply.ok();
         } else {
             reply.error(ENOENT);

@@ -13,6 +13,8 @@ pub const QRFS_MAGIC: u32 = 0x5152_4653;
 /// version del formato qrfs
 pub const QRFS_VERSION: u32 = 1;
 
+
+
 /// tipos de inodo
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum InodeKind {
@@ -58,11 +60,12 @@ impl Inode {
     }
 }
 
-/// entrada de directorio
+/// Representa una entrada dentro de una carpeta (ej: "hola.txt" -> Inodo 2)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirectoryEntry {
     pub name: String,
     pub inode_id: u32,
+    pub kind: InodeKind,
 }
 
 /// superblock qrfs
