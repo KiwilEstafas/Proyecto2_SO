@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# ==============================================================================
+# QRFS Wrapper Script
+# Este script actúa como interfaz unificada para las herramientas de QRFS.
+# Usa 'cargo run' para asegurar que siempre se ejecute la última versión del código.
+# ==============================================================================
+
+# Colores para mensajes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Función de ayuda
+show_help() {
+    echo -e "${BLUE}QRFS - Quick Response File System CLI${NC}"
+    echo "Uso: ./qrfs <comando> [argumentos]"
+    echo ""
+    echo "Comandos disponibles:"
+    echo -e "  ${GREEN}mkfs${NC}     Formatear un directorio como QRFS"
+    echo "            Uso: ./qrfs mkfs --output <DIR> [--blocks N]"
+    echo ""
+    echo -e "  ${GREEN}mount${NC}    Montar el sistema de archivos"
+    echo "            Uso: ./qrfs mount <DIR_QR> <PUNTO_MONTAJE>"
+    echo ""
+    echo -e "  ${GREEN}fsck${NC}     Verificar integridad y reparar errores"
+    echo "            Uso: ./qrfs fsck <DIR_QR>"
+    echo ""
+    echo -e "  ${GREEN}qr${NC}       Herramienta de extracción de QRs (qr_extract)"
+    echo "            Uso: ./qrfs qr <DIR_QR> <ID_INODO> --out <SALIDA>"
+    echo ""
+    echo -e "  ${GREEN}clean${NC}    Limpiar proyecto (cargo clean) y montajes"
+    echo ""
+}
+
+# Verificar si se pasó un argumento
+if [ -z "$1" ]; then
+    show_help
+    exit 1
+fi
+
+SUBCOMMAND=$1
+shift # Elimina el primer argumento (el comando) para pasar el resto a los binarios
+
+case "$SUBCOMMAND" in
+    mkfs)
+        # Ejecuta el binario mkfs
+        RUST_LOG=info cargo run --quiet --bin mkfs -- "$@"
+        ;;
+    mount)
+        # Ejecuta el binario mount
+        # Nota: Mount bloquea la terminal, así que no imprimimos mensaje de éxito final
+        echo -e "${BLUE}Montando QRFS... Presiona Ctrl+C para desmontar.${NC}"
+        RUST_LOG=info cargo run --quiet --bin mount -- "$@"
+        ;;
+    fsck)
+        # Ejecuta el binario fsck
+        RUST_LOG=info cargo run --quiet --bin fsck -- "$@"
+        ;;
+    qr|extract)
+        # Ejecuta el binario qr_extract
+        RUST_LOG=info cargo run --quiet --bin qr_extract -- "$@"
+        ;;
+    clean)
+        echo -e "${BLUE}Limpiando proyecto y desconectando montajes...${NC}"
+        fusermount -uz mnt 2>/dev/null
+        cargo clean
+        echo -e "${GREEN}Listo.${NC}"
+        ;;
+    help|--help|-h)
+        show_help
+        ;;
+    *)
+        echo -e "${RED}Error: Comando '$SUBCOMMAND' no reconocido.${NC}"
+        show_help
+        exit 1
+        ;;
+esac

@@ -258,17 +258,17 @@
    - [X] Verificación de contenido QR
 
 ## FASE 9 — Integración CLI
-- [ ] `qrfs mkfs disk.qrfs --size 10MB`
-- [ ] `qrfs mount disk.qrfs /mnt/qrfs`
-- [ ] `qrfs fsck disk.qrfs`
-- [ ] Mensajes de error claros y consistentes
-- [ ] Logging básico
+- [X] `qrfs mkfs disk.qrfs --size 10MB`
+- [X] `qrfs mount disk.qrfs /mnt/qrfs`
+- [X] `qrfs fsck disk.qrfs`
+- [X] Mensajes de error claros y consistentes
+- [X] Logging básico
 
 ## FASE 10 — Pruebas
-- [ ] Unit tests: inodos, bitmap, directorios
-- [ ] Tests de integración: mkfs + mount + fuse
-- [ ] Tests de `read/write`
-- [ ] Tests de manejo de errores
+- [X] Unit tests: inodos, bitmap, directorios
+- [X] Tests de integración: mkfs + mount + fuse
+- [X] Tests de `read/write`
+- [X] Tests de manejo de errores
 
 ## FASE 11 — Pulido
 - [ ] Remover warnings
