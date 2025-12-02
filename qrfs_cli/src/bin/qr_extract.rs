@@ -2,14 +2,13 @@
 
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process;
 use std::sync::Arc;
 
-use qrfs_core::disk::BLOCK_SIZE;
 use qrfs_core::errors::QrfsError;
 use qrfs_core::storage::{BlockStorage, QrStorageManager};
-use qrfs_core::{encode_block_to_qr, validate_qr_block, Superblock};
+use qrfs_core::Superblock;
 
 fn main() {
     if let Err(e) = run() {
@@ -123,47 +122,35 @@ fn run() -> Result<(), QrfsError> {
     let mut error_count = 0;
 
     for (idx, &block_id) in target_inode.blocks.iter().enumerate() {
-        // leer bloque del storage
-        let block_data = match storage.read_block(block_id) {
-            Ok(data) => data,
-            Err(e) => {
-                println!("qrfs qr: error: no se pudo leer bloque {} (id {}): {}", idx, block_id, e);
-                error_count += 1;
-                continue;
-            }
-        };
+        // obtener path del qr original
+        let source_path = storage.block_path(block_id);
         
-        // generar imagen qr
-        let qr_image = match encode_block_to_qr(&block_data) {
-            Ok(img) => img,
-            Err(e) => {
-                println!("qrfs qr: error: no se pudo generar qr para bloque {}: {}", idx, e);
-                error_count += 1;
-                continue;
-            }
-        };
+        if !source_path.exists() {
+            println!("qrfs qr: error: bloque {} (id {}) no existe en disco", idx, block_id);
+            error_count += 1;
+            continue;
+        }
         
-        // validar que el qr sea legible
-        match validate_qr_block(&qr_image) {
-            Ok(size) => {
-                total_bytes += size;
+        // leer tamanio del bloque para estadisticas
+        match storage.read_block(block_id) {
+            Ok(data) => {
+                total_bytes += data.len();
             }
             Err(e) => {
-                println!("qrfs qr: advertencia: bloque {} no pudo ser validado: {}", idx, e);
-                // no incrementamos error_count porque el qr se guardo
+                println!("qrfs qr: advertencia: no se pudo leer bloque {}: {}", idx, e);
             }
         }
         
-        // guardar con nombre correlativo
+        // copiar el qr directamente con nombre correlativo
         let output_filename = format!("block_{:04}.png", idx);
         let output_path = Path::new(&output_dir).join(output_filename);
         
-        match qr_image.save(&output_path) {
+        match fs::copy(&source_path, &output_path) {
             Ok(_) => {
                 extracted_count += 1;
             }
             Err(e) => {
-                println!("qrfs qr: error: no se pudo guardar qr {}: {}", idx, e);
+                println!("qrfs qr: error: no se pudo copiar qr {}: {}", idx, e);
                 error_count += 1;
                 continue;
             }

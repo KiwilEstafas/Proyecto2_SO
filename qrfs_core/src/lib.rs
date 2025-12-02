@@ -10,4 +10,4 @@ pub use crate::storage::{BlockStorage, QrStorageManager, InMemoryBlockStorage};
 pub use crate::fs::QrfsFilesystem;
 pub use crate::errors::QrfsError;
 pub use crate::fs_format::*;
-pub use crate::qr::{encode_block_to_qr, decode_qr_to_block, validate_qr_block};
+pub use crate::qr::validate_qr_block;

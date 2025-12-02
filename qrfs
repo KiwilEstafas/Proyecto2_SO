@@ -1,82 +1,104 @@
 #!/bin/bash
 
-# ==============================================================================
-# QRFS Wrapper Script
-# Interfaz unificada para todas las herramientas del proyecto.
-# ==============================================================================
-
-# Colores
+# colores
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-# Función de ayuda actualizada
 show_help() {
-    echo -e "${BLUE}QRFS - Quick Response File System CLI${NC}"
-    echo "Uso: ./qrfs <comando> [argumentos]"
+    echo -e "${BLUE}qrfs - quick response file system cli${NC}"
+    echo "uso: ./qrfs <comando> [argumentos]"
     echo ""
-    echo "Comandos Principales (Según PDF):"
-    echo -e "  ${GREEN}mkfs${NC}     Crear un sistema de archivos QRFS"
-    echo "            Uso: ./qrfs mkfs <QR_FOLDER> [--blocks N]"
+    echo "comandos principales:"
+    echo -e "  ${GREEN}mkfs${NC}     crear un sistema de archivos qrfs"
+    echo "            uso: ./qrfs mkfs <qr_folder> [--blocks n]"
     echo ""
-    echo -e "  ${GREEN}mount${NC}    Montar el sistema de archivos"
-    echo "            Uso: ./qrfs mount <QR_FOLDER> <MOUNTPOINT>"
+    echo -e "  ${GREEN}mount${NC}    montar el sistema de archivos"
+    echo "            uso: ./qrfs mount <qr_folder> <mountpoint>"
     echo ""
-    echo -e "  ${GREEN}fsck${NC}     Chequeo de consistencia"
-    echo "            Uso: ./qrfs fsck <QR_FOLDER>"
+    echo -e "  ${GREEN}fsck${NC}     chequeo de consistencia"
+    echo "            uso: ./qrfs fsck <qr_folder>"
     echo ""
-    echo "Herramientas Extra:"
-    echo -e "  ${GREEN}server${NC}   Iniciar Lector QR (Web App para el celular)"
-    echo "            Uso: ./qrfs server <CARPETA_DESTINO>"
+    echo "herramientas extra:"
+    echo -e "  ${GREEN}server${NC}   iniciar lector qr (modo manual)"
+    echo "            uso: ./qrfs server <carpeta_destino>"
     echo ""
-    echo -e "  ${GREEN}qr${NC}       Extraer QRs a imágenes (qr_extract)"
-    echo "            Uso: ./qrfs qr <QR_FOLDER> <ID_INODO> --out <SALIDA>"
+    echo -e "  ${GREEN}scan${NC}     iniciar escaner qr (modo automatico)"
+    echo "            uso: ./qrfs scan <carpeta_destino>"
     echo ""
-    echo -e "  ${GREEN}clean${NC}    Limpiar compilación y montajes pegados"
+    echo -e "  ${GREEN}qr${NC}       extraer qrs a imagenes"
+    echo "            uso: ./qrfs qr <qr_folder> <id_inodo> --out <salida>"
+    echo ""
+    echo -e "  ${GREEN}clean${NC}    limpiar compilacion y montajes"
     echo ""
 }
 
-# Verificar argumentos
+get_local_ip() {
+    # obtener ip local de la maquina
+    local ip=$(ip route get 1 | awk '{print $7}' | head -n1)
+    if [ -z "$ip" ]; then
+        ip=$(hostname -I | awk '{print $1}')
+    fi
+    echo "$ip"
+}
+
 if [ -z "$1" ]; then
     show_help
     exit 1
 fi
 
 SUBCOMMAND=$1
-shift # Sacamos el comando de la lista de argumentos
+shift
 
 case "$SUBCOMMAND" in
     mkfs)
-        # Sintaxis nueva: directo a la carpeta
         RUST_LOG=info cargo run --quiet --bin mkfs -- "$@"
         ;;
     mount)
-        echo -e "${BLUE}Montando QRFS... (Ctrl+C para salir)${NC}"
+        echo -e "${BLUE}montando qrfs... (ctrl+c para salir)${NC}"
         RUST_LOG=info cargo run --quiet --bin mount -- "$@"
         ;;
     fsck)
         RUST_LOG=info cargo run --quiet --bin fsck -- "$@"
         ;;
     server)
-        # El servidor web para el celular
-        echo -e "${BLUE}Iniciando servidor lector...${NC}"
+        echo -e "${BLUE}iniciando servidor lector (modo manual)...${NC}"
+        LOCAL_IP=$(get_local_ip)
+        echo -e "${YELLOW}abre en tu celular:${NC}"
+        echo -e "  http://${LOCAL_IP}:8080/"
+        echo ""
+        RUST_LOG=info cargo run --quiet --bin server -- "$@"
+        ;;
+    scan)
+        echo -e "${BLUE}iniciando escaner qr (modo automatico)...${NC}"
+        LOCAL_IP=$(get_local_ip)
+        echo -e "${YELLOW}abre en tu celular:${NC}"
+        echo -e "  ${GREEN}http://${LOCAL_IP}:8080/scanner${NC}"
+        echo ""
+        echo -e "${YELLOW}instrucciones:${NC}"
+        echo "  1. apunta la camara a cada codigo qr impreso"
+        echo "  2. el sistema detecta automaticamente el id del bloque"
+        echo "  3. los bloques duplicados se ignoran"
+        echo "  4. presiona 'pausar' si necesitas descansar"
+        echo ""
         RUST_LOG=info cargo run --quiet --bin server -- "$@"
         ;;
     qr|extract)
         RUST_LOG=info cargo run --quiet --bin qr_extract -- "$@"
         ;;
     clean)
-        echo -e "${BLUE}Limpiando entorno...${NC}"
+        echo -e "${BLUE}limpiando entorno...${NC}"
         fusermount -uz mnt 2>/dev/null
         cargo clean
-        echo -e "${GREEN}Listo.${NC}"
+        echo -e "${GREEN}listo.${NC}"
         ;;
     help|--help|-h)
         show_help
         ;;
     *)
-        echo -e "${RED}Error: Comando '$SUBCOMMAND' desconocido.${NC}"
+        echo -e "${RED}error: comando '$SUBCOMMAND' desconocido.${NC}"
         show_help
         exit 1
         ;;
