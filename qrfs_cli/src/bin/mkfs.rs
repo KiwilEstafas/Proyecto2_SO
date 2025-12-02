@@ -1,7 +1,7 @@
 use std::env;
 use std::process;
 
-use qrfs_core::disk::{Superblock, BLOCK_SIZE};
+use qrfs_core::disk::Superblock;
 use qrfs_core::errors::QrfsError;
 use qrfs_core::fs_format::{create_empty_bitmap, create_inode_table, serialize_superblock};
 use qrfs_core::storage::{BlockStorage, QrStorageManager};
@@ -16,16 +16,16 @@ fn main() {
 fn run() -> Result<(), QrfsError> {
     let args: Vec<String> = env::args().collect();
 
-    // Sintaxis: mkfs.qrfs <qrfolder> [--blocks N]
+    // sintaxis: mkfs.qrfs <qrfolder> [--blocks n]
     if args.len() < 2 {
         eprintln!("Uso: mkfs.qrfs <qrfolder/> [--blocks N]");
         return Ok(());
     }
 
     let qr_folder = &args[1];
-    let mut total_blocks = 400; // Valor por defecto seguro
+    let mut total_blocks = 400; // valor por defecto seguro
 
-    // Parseo manual de argumentos opcionales
+    // parseo manual de argumentos opcionales
     let mut i = 2;
     while i < args.len() {
         match args[i].as_str() {
@@ -42,9 +42,9 @@ fn run() -> Result<(), QrfsError> {
         i += 1;
     }
 
-    let inode_count = 64; // Cantidad fija de archivos soportados
+    let inode_count = 64; // cantidad fija de archivos soportados
 
-    // 1. Crear e inicializar Superblock
+    // crear e inicializar superblock
     let superblock = Superblock::new(total_blocks, inode_count);
     if !superblock.is_valid() {
         return Err(QrfsError::Other("Error interno creando superblock".into()));
@@ -57,18 +57,18 @@ fn run() -> Result<(), QrfsError> {
     let block_size = superblock.block_size as usize;
     let storage = QrStorageManager::new(qr_folder, block_size, superblock.total_blocks);
 
-    // 2. Inicializar disco físico (imágenes vacías)
+    // inicializar disco fisico (imagenes vacias)
     storage.init_empty_blocks()?;
 
-    // 3. Escribir Superblock (Bloque 0 - La "Firma" del inicio)
+    // escribir superblock (bloque 0 - la "firma" del inicio)
     let sb_bytes = serialize_superblock(&superblock)?;
     let mut sb_block = vec![0u8; block_size];
     sb_block[..sb_bytes.len()].copy_from_slice(&sb_bytes);
     storage.write_block(0, &sb_block)?;
 
-    // 4. Escribir Bitmap
+    // escribir bitmap
     let mut bitmap = create_empty_bitmap(superblock.total_blocks);
-    // Marcar bloques reservados como usados
+    // marcar bloques reservados como usados
     for blk in 0..superblock.data_block_start {
         let byte = (blk / 8) as usize;
         let bit = (blk % 8) as u8;
@@ -85,7 +85,7 @@ fn run() -> Result<(), QrfsError> {
         offset += block_size;
     }
 
-    // 5. Escribir Tabla de Inodos
+    // escribir tabla de inodos
     let inode_table_raw = create_inode_table(superblock.inode_count)?;
     let mut offset = 0;
     for i in 0..superblock.inode_table_blocks {

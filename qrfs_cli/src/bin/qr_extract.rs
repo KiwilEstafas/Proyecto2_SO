@@ -97,17 +97,17 @@ fn run() -> Result<(), QrfsError> {
     println!("qrfs qr: encontrado inodo {} con {} bloques", 
              target_inode.id, target_inode.blocks.len());
     
-    // validar tamanio del archivo
+    // validar tamaño del archivo
     if target_inode.blocks.is_empty() {
         println!("qrfs qr: advertencia: el archivo no tiene bloques asignados (archivo vacio)");
         return Ok(());
     }
     
     // advertir si es archivo muy grande
-    let estimated_qr_size = target_inode.blocks.len() * 10; // ~10kb por qr aproximadamente
+    let estimated_qr_size = target_inode.blocks.len() * 10; // aproximadamente 10kb por qr
     if target_inode.blocks.len() > 100 {
         println!("qrfs qr: advertencia: archivo grande ({} bloques)", target_inode.blocks.len());
-        println!("qrfs qr: tamanio estimado de salida: ~{} kb", estimated_qr_size);
+        println!("qrfs qr: tamaño estimado de salida: ~{} kb", estimated_qr_size);
     }
     
     println!();
@@ -131,7 +131,7 @@ fn run() -> Result<(), QrfsError> {
             continue;
         }
         
-        // leer tamanio del bloque para estadisticas
+        // leer tamaño del bloque para estadisticas
         match storage.read_block(block_id) {
             Ok(data) => {
                 total_bytes += data.len();
@@ -167,7 +167,7 @@ fn run() -> Result<(), QrfsError> {
     println!("extraccion completada:");
     println!("  bloques extraidos: {}", extracted_count);
     println!("  bloques con error: {}", error_count);
-    println!("  tamanio total: {} bytes", total_bytes);
+    println!("  tamaño total: {} bytes", total_bytes);
     println!("  directorio: {}", output_dir);
     
     if error_count > 0 {
@@ -193,7 +193,7 @@ fn print_usage() {
     eprintln!("  - los archivos regulares empiezan desde el inodo 1 o 2");
 }
 
-// helper: cargar todos los inodos del filesystem
+// cargar todos los inodos del filesystem
 fn load_all_inodes(
     storage: &Arc<QrStorageManager>,
     sb: &Superblock,

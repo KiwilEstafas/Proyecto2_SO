@@ -16,7 +16,7 @@ fn main() {
 fn run() -> Result<(), QrfsError> {
     let args: Vec<String> = env::args().collect();
     
-    // Sintaxis: fsck.qrfs <qrfolder>
+    // sintaxis: fsck.qrfs <qrfolder>
     if args.len() != 2 {
         eprintln!("Uso: fsck.qrfs <qrfolder/>");
         return Ok(());
@@ -32,27 +32,27 @@ fn run() -> Result<(), QrfsError> {
 
     let storage = QrStorageManager::new(qrfolder, block_size, total_blocks);
 
-    // PASO 1: Verificar Superblock (Firma)
+    // verificar superblock (firma)
     print!("[1/5] Verificando Superblock (Firma)... ");
     let superblock = check_superblock(&storage)?;
     println!("OK (Magic: {:X})", superblock.magic);
 
-    // PASO 2: Verificar Estructura
+    // verificar limites del disco
     print!("[2/5] Verificando límites del disco... ");
     check_disk_layout(&superblock)?;
     println!("OK");
 
-    // PASO 3: Cargar Bitmap
+    // analizar bitmap de espacio
     print!("[3/5] Analizando Bitmap de espacio... ");
     let bitmap = load_bitmap(&storage, &superblock)?;
     println!("OK");
 
-    // PASO 4: Cargar Inodos
+    // analizar tabla de inodos
     print!("[4/5] Analizando Tabla de Inodos... ");
     let inodes = load_inodes(&storage, &superblock)?;
     println!("OK ({} inodos activos)", inodes.len());
 
-    // PASO 5: Consistencia
+    // verificar consistencia bitmap vs inodos
     print!("[5/5] Verificando consistencia Bitmap vs Inodos... ");
     check_consistency(&bitmap, &inodes, &superblock)?;
     println!("OK");
@@ -63,7 +63,7 @@ fn run() -> Result<(), QrfsError> {
     Ok(())
 }
 
-// --- FUNCIONES AUXILIARES DE FSCK ---
+// funciones auxiliares de fsck 
 
 fn check_superblock(storage: &QrStorageManager) -> Result<Superblock, QrfsError> {
     let data = storage.read_block(0)?;
@@ -114,7 +114,7 @@ fn load_inodes(storage: &QrStorageManager, sb: &Superblock) -> Result<Vec<Inode>
 fn check_consistency(bitmap: &[u8], inodes: &[Inode], sb: &Superblock) -> Result<(), QrfsError> {
     let mut claimed_blocks = HashSet::new();
     
-    // Recolectar bloques reclamados por inodos
+    // recolectar bloques reclamados por inodos
     for inode in inodes {
         for &blk in &inode.blocks {
             if blk >= sb.total_blocks {
@@ -124,7 +124,7 @@ fn check_consistency(bitmap: &[u8], inodes: &[Inode], sb: &Superblock) -> Result
         }
     }
 
-    // Verificar contra bitmap
+    // verificar contra bitmap
     for blk in sb.data_block_start..sb.total_blocks {
         let byte = (blk / 8) as usize;
         let bit = (blk % 8) as u8;

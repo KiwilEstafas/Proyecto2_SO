@@ -1,20 +1,20 @@
 use actix_cors::Cors;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use qrfs_core::storage::{BlockStorage, QrStorageManager};
-use serde::{Deserialize, Serialize}; // Agregamos Serialize para responder JSON
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::sync::{Arc, Mutex};
 use base64::{engine::general_purpose, Engine as _}; 
 use serde_json;
 
-// Estructura para recibir datos
+// estructura para recibir datos
 #[derive(Deserialize)]
 struct ScanData {
     block_id: u32,
     content: String,
 }
 
-// Estructura para responder errores al celular
+// estructura para responder errores al celular
 #[derive(Serialize)]
 struct ResponseMsg {
     status: String,
@@ -139,7 +139,7 @@ SGVsbG8gV29ybGQ='></textarea>
     <div id="previewBox" class="preview-box hidden">
         <h3>contenido decodificado del bloque <span id="previewBlockId"></span></h3>
         <div class="metadata">
-            <strong>tamanio:</strong> <span id="previewSize"></span> bytes<br>
+            <strong>tamaño:</strong> <span id="previewSize"></span> bytes<br>
             <strong>tipo:</strong> <span id="previewType"></span>
         </div>
         <div class="preview-content" id="previewContent"></div>
@@ -177,16 +177,13 @@ SGVsbG8gV29ybGQ='></textarea>
 
         function decodeAndPreview(content, blockId) {
             try {
-                // intentar parsear como json
                 const parsed = JSON.parse(content);
                 if (parsed.data) {
-                    // tiene metadata
                     const decoded = atob(parsed.data);
                     showPreview(blockId, decoded, 'datos del filesystem');
                     return;
                 }
             } catch (e) {
-                // no es json, intentar decodificar directo
                 try {
                     const decoded = atob(content);
                     showPreview(blockId, decoded, 'base64 directo');
@@ -201,7 +198,6 @@ SGVsbG8gV29ybGQ='></textarea>
             document.getElementById('previewBlockId').textContent = blockId;
             document.getElementById('previewSize').textContent = content.length;
             
-            // detectar tipo de bloque por id
             let blockType = 'datos desconocidos';
             if (blockId == 0) {
                 blockType = 'superblock (metadata del fs)';
@@ -215,28 +211,23 @@ SGVsbG8gV29ybGQ='></textarea>
             
             document.getElementById('previewType').textContent = blockType;
             
-            // mostrar contenido apropiado segun tipo
             let preview = '';
             
-            // si es mayormente bytes nulos, mostrar resumen
             const nullCount = (content.match(/\0/g) || []).length;
             const printableCount = content.replace(/[^\x20-\x7E]/g, '').length;
             
             if (nullCount > content.length * 0.8) {
-                // mas del 80% son nulos
                 preview = '[bloque de metadata del filesystem]\n\n';
                 preview += 'bytes totales: ' + content.length + '\n';
                 preview += 'bytes nulos: ' + nullCount + '\n';
                 preview += 'bytes con datos: ' + (content.length - nullCount);
             } else if (printableCount > content.length * 0.3) {
-                // tiene texto legible
                 const printable = content.replace(/[^\x20-\x7E\n\r\t]/g, '.');
                 preview = printable.substring(0, 500);
                 if (content.length > 500) {
                     preview += '\n\n... (truncado, total: ' + content.length + ' bytes)';
                 }
             } else {
-                // mostrar hex dump estilo
                 preview = '[contenido binario]\n\n';
                 const bytes = [];
                 for (let i = 0; i < Math.min(64, content.length); i++) {
@@ -250,7 +241,6 @@ SGVsbG8gV29ybGQ='></textarea>
                 }
             }
             
-            // escapar html
             preview = preview.replace(/&/g, '&amp;')
                         .replace(/</g, '&lt;')
                         .replace(/>/g, '&gt;');
@@ -270,7 +260,6 @@ SGVsbG8gV29ybGQ='></textarea>
 
             let cleanText = decodedText.trim();
 
-            // mostrar preview antes de enviar
             decodeAndPreview(cleanText, blockId);
 
             fetch('/upload', {
@@ -284,7 +273,7 @@ SGVsbG8gV29ybGQ='></textarea>
             .then(response => response.json())
             .then(data => {
                 if (data.status === "ok") {
-                    resultDiv.innerText = "✓ " + data.message;
+                    resultDiv.innerText = "ok - " + data.message;
                     resultDiv.className = "status success";
                     
                     document.getElementById('blockId').value = parseInt(blockId) + 1;
@@ -293,7 +282,7 @@ SGVsbG8gV29ybGQ='></textarea>
                         html5QrcodeScanner.render(onScanSuccess);
                     }, 1500);
                 } else {
-                    resultDiv.innerText = "✗ error: " + data.message;
+                    resultDiv.innerText = "error: " + data.message;
                     resultDiv.className = "status error";
                     setTimeout(() => {
                         html5QrcodeScanner.render(onScanSuccess);
@@ -301,7 +290,7 @@ SGVsbG8gV29ybGQ='></textarea>
                 }
             })
             .catch(err => {
-                resultDiv.innerText = "✗ error de red: " + err;
+                resultDiv.innerText = "error de red: " + err;
                 resultDiv.className = "status error";
             });
         }
@@ -312,7 +301,7 @@ SGVsbG8gV29ybGQ='></textarea>
             let resultDiv = document.getElementById('result');
 
             if (!content) {
-                resultDiv.innerText = "✗ debes pegar el contenido del qr";
+                resultDiv.innerText = "debes pegar el contenido del qr";
                 resultDiv.className = "status error";
                 return;
             }
@@ -320,7 +309,6 @@ SGVsbG8gV29ybGQ='></textarea>
             resultDiv.innerText = "enviando bloque " + blockId + "...";
             resultDiv.className = "status";
 
-            // mostrar preview antes de enviar
             decodeAndPreview(content, blockId);
 
             try {
@@ -336,23 +324,22 @@ SGVsbG8gV29ybGQ='></textarea>
                 const data = await response.json();
 
                 if (data.status === "ok") {
-                    resultDiv.innerText = "✓ " + data.message;
+                    resultDiv.innerText = "ok - " + data.message;
                     resultDiv.className = "status success";
                     
                     document.getElementById('blockId').value = parseInt(blockId) + 1;
                     document.getElementById('qrContent').value = '';
                     document.getElementById('qrContent').focus();
                 } else {
-                    resultDiv.innerText = "✗ error: " + data.message;
+                    resultDiv.innerText = "error: " + data.message;
                     resultDiv.className = "status error";
                 }
             } catch (err) {
-                resultDiv.innerText = "✗ error de red: " + err;
+                resultDiv.innerText = "error de red: " + err;
                 resultDiv.className = "status error";
             }
         }
 
-        // iniciar en modo manual por defecto
         showMode('manual');
     </script>
 </body>
@@ -366,9 +353,7 @@ async fn upload_block(data: web::Json<ScanData>, state: web::Data<AppState>) -> 
     println!(">> recibido bloque id: {}", data.block_id);
     println!(">> longitud datos: {} caracteres", data.content.len());
 
-    // intentar parsear como json con metadata primero
     let bytes = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&data.content) {
-        // tiene metadata con block_id y data
         if let Some(data_str) = parsed.get("data").and_then(|v| v.as_str()) {
             println!("   formato: json con metadata");
             match general_purpose::STANDARD.decode(data_str) {
@@ -394,7 +379,6 @@ async fn upload_block(data: web::Json<ScanData>, state: web::Data<AppState>) -> 
             });
         }
     } else {
-        // no es json, intentar decodificar directo como base64
         println!("   formato: base64 directo");
         match general_purpose::STANDARD.decode(&data.content) {
             Ok(b) => b,
@@ -560,7 +544,6 @@ async fn scanner_page() -> impl Responder {
     </div>
 
     <script>
-        // forzar permisos de camara en http (desarrollo)
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             console.log('camara disponible');
         } else {
@@ -679,13 +662,11 @@ struct AutoScanResponse {
 async fn upload_auto(data: web::Json<AutoScanData>, state: web::Data<AppState>) -> impl Responder {
     println!(">> recibido qr para analisis automatico");
     
-    // intentar parsear como json con metadata
     if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&data.content) {
         if let (Some(block_id), Some(data_str)) = (
             parsed.get("block_id").and_then(|v| v.as_u64()),
             parsed.get("data").and_then(|v| v.as_str())
         ) {
-            // qr con metadata
             let bytes = match general_purpose::STANDARD.decode(data_str) {
                 Ok(b) => b,
                 Err(e) => {
@@ -719,7 +700,6 @@ async fn upload_auto(data: web::Json<AutoScanData>, state: web::Data<AppState>) 
         }
     }
     
-    // fallback: si no tiene metadata, usar modo secuencial
     let bytes = match general_purpose::STANDARD.decode(&data.content) {
         Ok(b) => b,
         Err(_) => {
@@ -805,9 +785,9 @@ async fn main() -> std::io::Result<()> {
             .wrap(Cors::permissive())
             .app_data(app_state.clone())
             .service(index)
-            .service(scanner_page)      // nueva ruta
+            .service(scanner_page)
             .service(upload_block)
-            .service(upload_auto)       // nuevo endpoint
+            .service(upload_auto)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

@@ -1,28 +1,26 @@
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// identificador de bloque
+// identificador de bloque
 pub type BlockId = u32;
 
-/// tamaño fijo del bloque logico
-pub const BLOCK_SIZE: usize = 128 ; // se bajo de 512 a 256 para lectura robuzta (en un paso aumeta 33% su tamaño)
+// tamaño fijo del bloque logico
+pub const BLOCK_SIZE: usize = 128;
 
-/// numero magico qrfs
+// numero magico qrfs
 pub const QRFS_MAGIC: u32 = 0x5152_4653;
 
-/// version del formato qrfs
+// version del formato qrfs
 pub const QRFS_VERSION: u32 = 1;
 
-
-
-/// tipos de inodo
+// tipos de inodo
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum InodeKind {
     File,
     Directory,
 }
 
-/// estructura del inodo
+// estructura del inodo
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inode {
     pub id: u32,
@@ -30,13 +28,13 @@ pub struct Inode {
 
     pub size: u64,
 
-    /// bloques directos
+    // bloques directos
     pub blocks: Vec<BlockId>,
 
-    /// permisos estilo unix simplificados
+    // permisos estilo unix simplificados
     pub mode: u16,
 
-    /// timestamps unix
+    // timestamps unix
     pub created_at: u64,
     pub modified_at: u64,
 }
@@ -60,7 +58,7 @@ impl Inode {
     }
 }
 
-/// Representa una entrada dentro de una carpeta (ej: "hola.txt" -> Inodo 2)
+// representa una entrada dentro de una carpeta 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirectoryEntry {
     pub name: String,
@@ -68,9 +66,8 @@ pub struct DirectoryEntry {
     pub kind: InodeKind,
 }
 
-/// superblock qrfs
-///
-/// bloque 0 contiene esta estructura serializada con bincode
+// superblock qrfs
+// bloque 0 contiene esta estructura serializada con bincode
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Superblock {
     pub magic: u32,
@@ -79,44 +76,38 @@ pub struct Superblock {
     pub block_size: u32,
     pub total_blocks: u32,
 
-    /// inicio del bitmap
+    // inicio del bitmap
     pub free_map_start: BlockId,
     pub free_map_blocks: u32,
 
-    /// inicio de la tabla de inodos
+    // inicio de la tabla de inodos
     pub inode_table_start: BlockId,
     pub inode_count: u32,
     pub inode_table_blocks: u32,
 
-    /// inodo root
+    // inodo root
     pub root_inode: u32,
 
-    /// inicio de los bloques de datos
+    // inicio de los bloques de datos
     pub data_block_start: BlockId,
 }
 
 impl Superblock {
     pub fn new(total_blocks: u32, inode_count: u32) -> Self {
-        // Bloque 0 siempre es Superblock
+        // bloque 0 siempre es superblock
         let block_size = BLOCK_SIZE as u32;
         let free_map_start = 1;
 
-        // Bitmap: 1 bloque de 512 bytes tiene 4096 bits -> cubre 4096 bloques
-        // Para este proyecto es suficiente 1 bloque de mapa siempre.
         let free_map_blocks = 1;
 
         let inode_table_start = free_map_start + free_map_blocks;
 
-        // --- CORRECCIÓN AQUÍ ---
-        // Calculamos cuántos bloques necesitamos para los inodos.
-        // Un inodo vacío serializado con bincode pesa aprox 50-60 bytes.
-        // Asumimos 80 bytes por seguridad.
+        // calcular cuantos bloques necesitamos para los inodos
         let bytes_per_inode = 80;
         let total_inode_bytes = inode_count * bytes_per_inode;
 
-        // División techo (ceiling division) para asegurar que quepan
+        // division techo (ceiling division) para asegurar que quepan
         let inode_table_blocks = (total_inode_bytes + block_size - 1) / block_size;
-        // -----------------------
 
         let data_block_start = inode_table_start + inode_table_blocks;
 

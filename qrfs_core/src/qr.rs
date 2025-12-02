@@ -6,14 +6,11 @@ use rqrr;
 
 use crate::errors::QrfsError;
 
-/// valida que un bloque qr pueda ser decodificado correctamente
-/// 
-/// retorna el tamanio de los datos decodificados o error
+// valida que un bloque qr pueda ser decodificado correctamente
+// retorna el tamaño de los datos decodificados o error
 pub fn validate_qr_block(img: &DynamicImage) -> Result<usize, QrfsError> {
-    // convertir imagen a escala de grises
     let img_gray = img.to_luma8();
 
-    // preparar imagen para deteccion qr
     let mut decoder = rqrr::PreparedImage::prepare(img_gray);
     let grids = decoder.detect_grids();
 
@@ -21,28 +18,23 @@ pub fn validate_qr_block(img: &DynamicImage) -> Result<usize, QrfsError> {
         return Err(QrfsError::Other("no se detecto codigo qr en la imagen".into()));
     }
 
-    // decodificar contenido del qr
     let (_meta, content_string) = grids[0]
         .decode()
         .map_err(|e| QrfsError::Other(format!("error decodificando qr: {}", e)))?;
 
-    // intentar parsear como json con metadata
     let data_size = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content_string) {
-        // tiene metadata, extraer el campo data
         if let Some(data_str) = parsed.get("data").and_then(|v| v.as_str()) {
             let decoded = general_purpose::STANDARD
                 .decode(data_str)
                 .map_err(|e| QrfsError::Other(format!("error decodificando base64: {}", e)))?;
             decoded.len()
         } else {
-            // no tiene campo data, intentar decodificar directo
             let decoded = general_purpose::STANDARD
                 .decode(&content_string)
                 .map_err(|e| QrfsError::Other(format!("error decodificando base64: {}", e)))?;
             decoded.len()
         }
     } else {
-        // no es json, asumir base64 directo
         let decoded = general_purpose::STANDARD
             .decode(&content_string)
             .map_err(|e| QrfsError::Other(format!("error decodificando base64: {}", e)))?;
@@ -60,7 +52,6 @@ mod tests {
 
     #[test]
     fn validate_qr_block_works() {
-        // crear un qr de prueba con metadata
         let test_data = b"test validation";
         let b64_string = general_purpose::STANDARD.encode(test_data);
         let metadata = format!(r#"{{"block_id":0,"data":"{}"}}"#, b64_string);
@@ -79,7 +70,6 @@ mod tests {
 
     #[test]
     fn validate_qr_block_old_format_works() {
-        // crear un qr sin metadata (formato viejo)
         let test_data = b"test validation old";
         let b64_string = general_purpose::STANDARD.encode(test_data);
         
@@ -97,7 +87,6 @@ mod tests {
 
     #[test]
     fn decode_invalid_image_fails() {
-        // crear imagen vacia sin qr
         let empty_img = DynamicImage::new_luma8(200, 200);
         let result = validate_qr_block(&empty_img);
         assert!(result.is_err());

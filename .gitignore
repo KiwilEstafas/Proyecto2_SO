@@ -2,7 +2,7 @@
 /target/
 **/target/
 
-# cargo lock para binarios (comentar si es libreria)
+# cargo lock para binarios 
 Cargo.lock
 
 # archivos temporales de rust

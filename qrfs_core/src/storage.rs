@@ -1,9 +1,7 @@
-use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-// dependencias para qr e imagenes
 use base64::{engine::general_purpose, Engine as _};
 use image::Luma;
 use qrcode::QrCode;
@@ -73,9 +71,7 @@ impl BlockStorage for QrStorageManager {
         self.total_blocks
     }
 
-    // =========================================================
-    // lectura: png -> qr (texto json con metadata) -> bytes binarios
-    // =========================================================
+    // leer bloque: decodifica qr desde png y extrae los datos binarios
     fn read_block(&self, id: BlockId) -> Result<Vec<u8>, QrfsError> {
         self.check_range(id)?;
         let path = self.block_path(id);
@@ -84,12 +80,10 @@ impl BlockStorage for QrStorageManager {
             return Ok(vec![0u8; self.block_size]);
         }
 
-        // 1. abrir imagen y convertir a grises
         let img_dynamic = image::open(&path)
             .map_err(|e| QrfsError::Other(format!("error abriendo imagen: {}", e)))?;
         let img_gray = img_dynamic.to_luma8();
 
-        // 2. detectar qr
         let mut decoder = rqrr::PreparedImage::prepare(img_gray);
         let grids = decoder.detect_grids();
         if grids.is_empty() {
@@ -99,32 +93,28 @@ impl BlockStorage for QrStorageManager {
             )));
         }
 
-        // 3. decodificar contenido (rqrr devuelve string utf-8)
         let (_meta, content_string) = grids[0]
             .decode()
             .map_err(|e| QrfsError::Other(format!("error decodificando qr (rqrr): {}", e)))?;
 
-        // 4. intentar parsear como json con metadata
+        // intentar parsear como json con metadata, sino asumir base64 directo
         let data = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content_string) {
-            // tiene metadata con block_id y data
             if let Some(data_str) = parsed.get("data").and_then(|v| v.as_str()) {
                 general_purpose::STANDARD
                     .decode(data_str)
                     .map_err(|e| QrfsError::Other(format!("error decodificando base64 desde metadata: {}", e)))?
             } else {
-                // fallback: intentar decodificar el contenido directo como base64
                 general_purpose::STANDARD
                     .decode(&content_string)
                     .map_err(|e| QrfsError::Other(format!("error decodificando base64: {}", e)))?
             }
         } else {
-            // no es json, asumir que es base64 directo (compatibilidad con qrs viejos)
             general_purpose::STANDARD
                 .decode(&content_string)
                 .map_err(|e| QrfsError::Other(format!("error decodificando base64: {}", e)))?
         };
 
-        // 5. ajustar tamanio al buffer esperado
+        // ajustar tamaño del resultado al block_size esperado
         let mut result = data;
         if result.len() > self.block_size {
             result.truncate(self.block_size);
@@ -136,9 +126,7 @@ impl BlockStorage for QrStorageManager {
         Ok(result)
     }
 
-    // =========================================================
-    // escritura: bytes binarios -> json con metadata -> qr -> png
-    // =========================================================
+    // escribir bloque: codifica datos binarios en qr y guarda como png
     fn write_block(&self, id: BlockId, data: &[u8]) -> Result<(), QrfsError> {
         self.check_range(id)?;
 
@@ -146,24 +134,20 @@ impl BlockStorage for QrStorageManager {
             return Err(QrfsError::Other(format!("datos muy grandes")));
         }
 
-        // 1. codificar binario a base64
         let b64_string = general_purpose::STANDARD.encode(data);
 
-        // 2. crear metadata con id del bloque (formato json compacto)
+        // formato json: {"block_id":X,"data":"base64..."}
         let metadata = format!(r#"{{"block_id":{},"data":"{}"}}"#, id, b64_string);
 
-        // 3. generar qr a partir del json
         let code = QrCode::new(metadata)
             .map_err(|e| QrfsError::Other(format!("error generando qr: {}", e)))?;
 
-        // 4. renderizar
         let image = code
             .render::<Luma<u8>>()
             .min_dimensions(200, 200)
             .max_dimensions(200, 200)
             .build();
 
-        // 5. guardar
         let path = self.block_path(id);
         if let Some(parent) = path.parent() {
             let _ = fs::create_dir_all(parent);
@@ -177,7 +161,7 @@ impl BlockStorage for QrStorageManager {
     }
 }
 
-// --- mantenemos el inmemorystorage igual ---
+// almacenamiento en memoria para testing
 pub struct InMemoryBlockStorage {
     block_size: usize,
     total_blocks: u32,
